@@ -735,8 +735,26 @@ main { flex: 1; display: flex; }
 #result[data-answer="no"] .plate-left { right: calc(50% + 10px); }
 #result[data-answer="no"] .plate-right { left: calc(50% + 10px); }
 
-.result-name { margin: 0; font-family: var(--display); font-size: clamp(1.6rem, 3.6vw, 2.3rem); line-height: 1.15; color: var(--gold); }
-.result-line { margin: 10px auto 0; max-width: 30rem; color: var(--page-muted); font-size: 1.12rem; }
+.result-name {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 40px 9px;
+  border: 2px solid #8a4b08;
+  border-radius: 10px;
+  background: linear-gradient(#fff1c4, #f2c45a);
+  box-shadow: 0 4px 0 #8a4b08, 0 0 0 4px rgba(242, 182, 50, 0.25);
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  line-height: 1.15;
+  color: #3a1206;
+}
+.result-name::before, .result-name::after { content: "\2726"; position: absolute; top: 50%; transform: translateY(-50%); font-size: 0.6em; color: var(--crimson); }
+.result-name::before { left: 14px; }
+.result-name::after { right: 14px; }
+.result-name:empty { display: none; }
+.result-line { margin: 14px auto 0; max-width: 30rem; color: var(--page-muted); font-size: 1.12rem; }
 .teasers { list-style: none; margin: 14px auto 0; padding: 0; display: grid; gap: 8px; max-width: 26rem; }
 .teasers li {
   padding: 10px 16px;
@@ -1020,10 +1038,28 @@ main { flex: 1; display: flex; }
   mix-blend-mode: screen;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .98 0 0 0 0 .93 0 0 0 0 .86 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-/* Retro props from the GROG poster: a spinning vinyl and a disco ball */
-.vinyl { position: absolute; z-index: 1; top: calc(var(--topbar) + 40px); right: -70px; width: 190px; height: 190px; animation: spin 9s linear infinite; }
-.disco { position: absolute; z-index: 1; bottom: 18%; left: -48px; width: 150px; height: 150px; animation: sway 6s ease-in-out infinite alternate; }
-@keyframes sway { from { rotate: -8deg; } to { rotate: 8deg; } }
+/* Desi meets Chinese, hanging under the bunting: marigold garlands (left) and a
+ * glowing red lantern (right). Plus a spinning vinyl from the GROG poster. */
+.garland { position: absolute; z-index: 1; top: calc(var(--topbar) + 4px); width: 20px; transform-origin: top center; animation: sway 5s ease-in-out infinite alternate; }
+.g-1 { left: 22px; height: 175px; }
+.g-2 { left: 50px; height: 122px; animation-delay: -2s; }
+.lantern {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--topbar) + 6px);
+  right: 4%;
+  width: 54px;
+  height: 135px;
+  transform-origin: top center;
+  filter: drop-shadow(0 0 18px rgba(255, 110, 60, 0.55));
+  animation: sway 4.2s ease-in-out infinite alternate;
+}
+@keyframes sway { from { rotate: -5deg; } to { rotate: 5deg; } }
+.vinyl { position: absolute; z-index: 1; bottom: 17%; left: -72px; width: 180px; height: 180px; animation: spin 9s linear infinite; }
+
+/* Rangoli medallion sitting on the top edge of the form and the end card */
+.start-form, .profile-card { position: relative; }
+.medal { position: absolute; top: -27px; left: 50%; width: 54px; height: 54px; transform: translateX(-50%); filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35)); }
 .spark { position: absolute; z-index: 1; width: 26px; height: 26px; color: var(--gold); animation: twinkle 2.8s ease-in-out infinite; }
 .sp-1 { top: 30%; left: 2.5%; }
 .sp-2 { top: 11%; right: 14%; width: 34px; height: 34px; color: var(--pink); animation-delay: -1s; }
@@ -1139,6 +1175,7 @@ body:not([data-screen="start"]):not([data-screen="done"]) .corner { display: non
   .screen-start { flex-direction: column; text-align: center; }
   .start-hero { display: flex; flex-direction: column; align-items: center; }
   .presenter { align-items: center; }
+  .start-form .medal { left: auto; right: 22px; transform: none; } /* keep clear of the left-aligned heading */
   .intro { margin-inline: auto; }
   .start-hero h1 { font-size: clamp(2.6rem, 8vw, 4.2rem); }
   .intro { margin-top: 12px; }
@@ -1177,7 +1214,8 @@ body:not([data-screen="start"]):not([data-screen="done"]) .corner { display: non
   .presenter-sub { font-size: 0.7rem; }
   .intro { display: none; } /* the three how-to lines say the same; keeps the form on one screen */
   .corner { width: 84px; height: 84px; }
-  .vinyl, .disco { display: none; }
+  .vinyl, .garland, .lantern { display: none; }
+  .medal { width: 44px; height: 44px; top: -22px; }
   .sp-1, .sp-2, .sp-4 { display: none; }
 
   .screen-play { --card-h: clamp(320px, calc(100dvh - var(--topbar) - 200px), 620px); padding: 8px 12px; gap: 8px; }
@@ -1212,7 +1250,7 @@ body:not([data-screen="start"]):not([data-screen="done"]) .corner { display: non
   .fan { display: none; }
 }
 @media (orientation: portrait) and (min-width: 601px) {
-  .vinyl { width: 130px; height: 130px; right: -60px; }
+  .lantern { width: 42px; height: 105px; right: 3%; }
 }
 
 /* Short landscape screens (small laptops, iPad landscape) */
