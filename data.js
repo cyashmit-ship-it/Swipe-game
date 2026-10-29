@@ -5,7 +5,7 @@
 
 const GAME = {
   // Paste the Apps Script web app URL here (it ends in /exec).
-  scriptUrl: "PASTE_YOUR_APPS_SCRIPT_URL_HERE",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbzl2MKv2vZH6tWhssXQCWOPy9rTw88mmeg2slhx4xBrKA1Cdk824qc2TPlahnrvxJ8/exec",
 
   // WORKING TITLE — final name and intro copy still to be decided.
   title: "Is It a Match?",
