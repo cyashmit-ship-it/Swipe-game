@@ -172,6 +172,7 @@
   let S = store.get(LS_STATE, null);
   let busy = false; // a card is flying off
   let starting = false; // waiting for the token check
+  let resultTimer = null;
   const save = () => store.set(LS_STATE, S);
 
   const cardById = (id) => CARDS.find((c) => c.id === id);
@@ -217,6 +218,7 @@
     $("#exitConfirm").textContent = T.messages.exitLeave;
     $("#pBack").textContent = T.profileBack;
     $("#changeText").textContent = T.results.change;
+    $("#tapHint").textContent = T.results.tapHint;
     $("#crushMeans").textContent = T.rounds[2].crushMeans || "";
     const how = $("#startHow");
     how.innerHTML = "";
@@ -254,7 +256,7 @@
 
   function preload(card) {
     if (!card) return;
-    [...card.photos, card.twist && card.twist.photo].filter(Boolean).forEach((p) => {
+    [...card.photos, card.twist && card.twist.photo, ...(card.desi || []).map((d) => d.photo)].filter(Boolean).forEach((p) => {
       const i = new Image();
       i.src = p.src;
     });
@@ -306,12 +308,12 @@
     ev.preventDefault();
     if (starting) return;
     const form = ev.target;
-    const token = form.token.value.replace(/\s+/g, "").toUpperCase();
+    const token = form.token.value.replace(/\s+/g, "");
     const age = parseInt(form.age.value, 10);
     const gender = (form.querySelector("input[name=gender]:checked") || {}).value;
     const M = T.messages;
     if (!token) return showFormError(M.noToken);
-    if (!/^[A-Z0-9-]{1,20}$/.test(token)) return showFormError(M.badToken);
+    if (!/^\d{1,9}$/.test(token)) return showFormError(M.badToken);
     if (!(age >= 5 && age <= 99)) return showFormError(M.badAge);
     if (!gender) return showFormError(M.noGender);
     if (!configured()) return showFormError("Setup needed: the Apps Script link is missing in data.js.");
@@ -335,6 +337,7 @@
     if (!res) return showFormError(M.offline);
     if (!res.ok) {
       if (res.code === "used") return showFormError(fill(M.used, { token: res.token }));
+      if (res.code === "in_use") return showFormError(fill(M.inUse, { token: res.token }));
       return showFormError(res.message || M.offline);
     }
 
@@ -449,16 +452,14 @@
     preload(nextCard);
   }
 
-  // Round 1: the twist is the profile (big photo + name); the original dish
-  // shows as a small photo under the name. Round 2: the two desi dishes share
-  // the photo area, each with its name.
+  // The card shows the original dish (round 1) or the cuisine (round 2).
+  // The twist is only revealed after a Yes, on the match screen.
   function cardEl(card, cls) {
     const R = T.rounds[card.part];
-    const p1 = card.part === 1;
     const el = document.createElement("article");
     el.className = `card part-${card.part} ${cls}`;
     el.dataset.id = card.id;
-    el.setAttribute("aria-label", p1 ? `${card.twist.name}. ${card.twist.line}` : `${card.name}, made desi: ${card.photos.map((p) => p.caption).join(", ")}`);
+    el.setAttribute("aria-label", `${card.name}. ${card.bio}`);
 
     const banner = document.createElement("p");
     banner.className = "card-banner";
@@ -468,17 +469,8 @@
     el.append(banner);
 
     const photos = document.createElement("div");
-    photos.className = `card-photos ${p1 ? "is-single" : "is-split"}`;
-    (p1 ? [card.twist.photo] : card.photos.slice(0, 2)).forEach((p) => {
-      const ph = photoEl(p);
-      if (!p1) {
-        const cap = document.createElement("span");
-        cap.className = "split-cap";
-        cap.textContent = p.caption;
-        ph.append(cap);
-      }
-      photos.append(ph);
-    });
+    photos.className = "card-photos";
+    photos.append(photoEl(card.photos[0]));
     const info = document.createElement("button");
     info.type = "button";
     info.className = "info-btn";
@@ -503,22 +495,12 @@
     const body = document.createElement("div");
     body.className = "card-info";
     body.innerHTML = `<div class="name-row"><h3></h3><span class="spice"></span></div>
-      <p class="origin"></p><p class="bio"></p><ul class="chips"></ul>`;
-    body.querySelector("h3").textContent = p1 ? card.twist.name : card.name;
+      <p class="from"><svg><use href="#i-pin"/></svg><span></span></p><p class="bio"></p><ul class="chips"></ul>`;
+    body.querySelector("h3").textContent = card.name;
     body.querySelector(".spice").textContent = "🌶️".repeat(card.spice || 1);
     body.querySelector(".spice").setAttribute("aria-label", `${T.profileLabels.spice}: ${card.spice || 1} of 3`);
-    const origin = body.querySelector(".origin");
-    if (p1) {
-      // Small round photo of the original dish + "Twist on Masala Dosa"
-      origin.append(photoEl(card.photos[0], "origin-photo"));
-      const t = document.createElement("span");
-      t.textContent = fill(R.twistOf, { name: card.name });
-      origin.append(t);
-    } else {
-      origin.innerHTML = `<svg><use href="#i-pin"/></svg><span></span>`;
-      origin.lastChild.textContent = fill(R.madeDesi, { from: card.from, name: card.name });
-    }
-    body.querySelector(".bio").textContent = p1 ? card.twist.line : card.bio;
+    body.querySelector(".from span").textContent = card.from;
+    body.querySelector(".bio").textContent = card.bio;
     const chips = body.querySelector(".chips");
     (card.chips || []).forEach((c) => {
       const li = document.createElement("li");
@@ -537,7 +519,8 @@
     const p1 = card.part === 1;
     const strip = $("#pPhotos");
     strip.innerHTML = "";
-    (p1 ? [card.twist.photo, card.photos[0]] : card.photos).forEach((p) => {
+    // Only the original: the twist stays a surprise until the answer.
+    card.photos.forEach((p) => {
       const ph = photoEl(p, "sheet-photo");
       const cap = document.createElement("span");
       cap.className = "sheet-cap";
@@ -545,9 +528,9 @@
       ph.append(cap);
       strip.append(ph);
     });
-    $("#pName").textContent = p1 ? card.twist.name : card.name;
-    $("#pFrom").textContent = p1 ? fill(T.rounds[1].twistOf, { name: card.name }) : fill(T.rounds[2].madeDesi, { from: card.from, name: card.name });
-    $("#pBio").textContent = p1 ? card.twist.line : card.bio;
+    $("#pName").textContent = card.name;
+    $("#pFrom").textContent = card.from;
+    $("#pBio").textContent = card.bio;
     const dl = $("#pFacts");
     dl.innerHTML = "";
     const rows = [
@@ -663,21 +646,18 @@
         enqueue("answer", { token: S.token, attempt: S.attempt, card: opts.moveFrom, answer: "Yes" });
       }
       S.crush = card.id;
-      S.phase = "result"; // the Desi Crush screen waits for Next
     }
+    if (answer !== "No") S.phase = "result";
     save();
     enqueue("answer", { token: S.token, attempt: S.attempt, card: card.id, answer });
     if (navigator.vibrate) navigator.vibrate(answer === "No" ? 15 : answer === CRUSH ? [30, 40, 60] : [20, 40, 30]);
-    if (answer === "Yes") burst($("#deckBurst"), "yes", true);
     const game = S;
     await flyOut($("#deck .is-top"), dir);
     busy = false;
     if (S !== game) return; // reset meanwhile (for example by a team restart)
-    if (answer === CRUSH) {
-      renderProgress();
-      return showResult(card);
-    }
-    advance();
+    if (answer === "No") return advance();
+    renderProgress();
+    showResult(card, answer);
   }
 
   function crushTap() {
@@ -702,43 +682,77 @@
     return photoEl(photo, `plate ${cls}`);
   }
 
-  // The Desi Crush screen: the two desi dishes crash together. Waits for Next.
-  function showResult(card) {
+  // The match screen. Round 1: the original and its twist slide in and meet.
+  // Round 2: the cuisine's two desi dishes. Yes moves on by itself; the
+  // Desi Crush screen (plates crash together) waits for Next.
+  function showResult(card, answer) {
+    const crush = answer === CRUSH;
     const R = T.results;
     const ov = $("#result");
-    ov.dataset.answer = "crush";
+    ov.dataset.answer = crush ? "crush" : "yes";
     ov.dataset.part = card.part;
     const plates = $("#plates");
     plates.innerHTML = "";
-    plates.append(plate(card.photos[0], "plate-left"), plate(card.photos[1] || card.photos[0], "plate-right"));
-    $("#resultTitle").textContent = R.crush;
-    $("#resultName").textContent = fill(R.crushName, { name: card.name });
-    $("#resultLine").textContent = R.crushLine;
+    const teasers = $("#teasers");
+    teasers.innerHTML = "";
+    let name, line;
+    if (card.part === 1) {
+      plates.append(plate(card.photos[0], "plate-left"), plate(card.twist.photo, "plate-right"));
+      name = card.twist.name;
+      line = card.twist.line;
+    } else {
+      const d = card.desi || [];
+      plates.append(plate((d[0] || {}).photo || card.photos[0], "plate-left"), plate((d[1] || d[0] || {}).photo || card.photos[0], "plate-right"));
+      name = fill(R.desiName, { name: card.name });
+      line = R.teaserIntro;
+      d.forEach((x) => {
+        const li = document.createElement("li");
+        li.textContent = x.name;
+        teasers.append(li);
+      });
+    }
+    const title = crush ? R.crush : R.match;
+    $("#resultTitle").textContent = title;
+    $("#resultName").textContent = name;
+    $("#resultLine").textContent = line;
     const nextBtn = $("#nextBtn");
     nextBtn.textContent = S.index === CARDS.length - 1 ? R.last : R.next;
+    nextBtn.hidden = !crush;
+    $("#tapHint").hidden = crush;
+    $("#timer").hidden = crush;
+
     ov.hidden = false;
     ov.classList.remove("is-in");
     void ov.offsetWidth;
     ov.classList.add("is-in");
-    burst($("#burst"), "crush");
-    nextBtn.focus({ preventScroll: true });
+    burst($("#burst"), crush ? "crush" : "yes");
+
+    clearTimeout(resultTimer);
+    if (crush) return nextBtn.focus({ preventScroll: true });
+    const len = title.length + name.length + line.length + teasers.textContent.length;
+    const min = (Number(R.minSeconds) || 2) * 1000;
+    const max = Math.max(min, (Number(R.maxSeconds) || 3.5) * 1000);
+    const ms = Math.max(min, Math.min(max, 1200 + len * 16));
+    $("#timer").style.setProperty("--ms", `${ms}ms`);
+    resultTimer = setTimeout(next, ms);
   }
 
   function hideResult() {
+    clearTimeout(resultTimer);
     $("#result").hidden = true;
     $("#burst").innerHTML = "";
   }
 
-  function burst(host, kind, small = false) {
+  function burst(host, kind) {
     host.innerHTML = "";
     if (reduceMotion) return;
     const glyphs = kind === "crush" ? ["🌶️", "💥", "🔥", "💛", "✨"] : ["💚", "❤️", "✨"];
-    const n = kind === "crush" ? 34 : small ? 12 : 22;
+    const n = kind === "crush" ? 34 : 22;
     for (let i = 0; i < n; i++) {
       const s = document.createElement("span");
       s.textContent = glyphs[i % glyphs.length];
       const a = (Math.PI * 2 * i) / n + Math.random() * 0.3;
-      const d = small ? 90 + Math.random() * 120 : (kind === "crush" ? 220 : 160) + Math.random() * 240;
+      const d = (kind === "crush" ? 220 : 160) + Math.random() * 240;
       s.style.setProperty("--x", `${Math.cos(a) * d}px`);
       s.style.setProperty("--y", `${Math.sin(a) * d}px`);
       s.style.setProperty("--d", `${(kind === "crush" ? 420 : 0) + Math.random() * 120}ms`);
@@ -746,7 +760,7 @@
     }
   }
 
-  // Next button on the Desi Crush screen.
+  // Leaves the match screen (timer, tap, or the Next button on a Desi Crush).
   function next() {
     if (busy || !S || S.phase !== "result") return;
     hideResult();
@@ -830,9 +844,15 @@
 
   // ------------------------------------------------------------ finish
 
+  // All 15 twists: 5 Chinese twists + 2 desi dishes for each cuisine.
+  function twistPool() {
+    return CARDS.flatMap((c) => (c.part === 1 ? [{ name: c.twist.name, photo: c.twist.photo }] : (c.desi || []).map((d) => ({ name: d.name, photo: d.photo }))));
+  }
+
   function finish() {
     const prof = profileFor(S.answers);
     S.profile = prof.name;
+    S.match = Math.floor(Math.random() * twistPool().length); // just for fun, not sent anywhere
     S.phase = "done";
     S.last = null;
     save();
@@ -848,6 +868,14 @@
     $("#profileName").textContent = prof.name;
     $("#profileLine").textContent = prof.line;
     $("#nextPlayerBtn").textContent = D.nextPlayer;
+    const pool = twistPool();
+    const m = pool[(S.match ?? 0) % pool.length];
+    $("#matchKicker").textContent = D.matchKicker;
+    $("#matchName").textContent = m.name;
+    $("#matchLine").textContent = fill(D.matchLine, { name: m.name });
+    const mp = $("#matchPhoto");
+    mp.innerHTML = "";
+    mp.append(photoEl(m.photo, "match-photo"));
     const p1 = CARDS.filter((c) => c.part === 1);
     const p2 = CARDS.filter((c) => c.part === 2);
     const yesIn = (list) => list.filter((c) => isYes(S.answers[c.id])).length;
@@ -872,10 +900,11 @@
       const li = document.createElement("li");
       li.className = `tile part-${c.part}`;
       li.dataset.answer = a === CRUSH ? "crush" : a.toLowerCase();
-      li.append(photoEl(c.part === 1 ? c.twist.photo : c.photos[0], "tile-photo"));
+      const twist = c.part === 1 && (a === "Yes" || a === CRUSH);
+      li.append(photoEl(twist ? c.twist.photo : c.photos[0], "tile-photo"));
       const t = document.createElement("p");
       t.innerHTML = "<b></b><span></span>";
-      t.firstChild.textContent = c.part === 1 ? c.twist.name : c.name;
+      t.firstChild.textContent = twist ? c.twist.name : c.name;
       t.lastChild.textContent = a === CRUSH ? T.buttons.crush : a;
       li.append(t);
       tiles.append(li);
@@ -957,7 +986,7 @@
     if (!r.ok) return teamMsg(r.message || "That didn't work.", "error");
     if (!r.attempts.length) return teamMsg(`Token ${r.token} hasn't played yet. They can start normally.`);
     const lines = r.attempts.map(
-      (a) => `Attempt ${a.attempt}: ${a.status}, ${a.answered} of ${r.total} answered${a.duplicate ? ` (${a.duplicate})` : ""}`,
+      (a) => `Attempt ${a.attempt}: ${a.status}, ${a.answered} of ${r.total} answered${a.device ? `, device ${a.device}` : ""}${a.duplicate ? ` (${a.duplicate})` : ""}`,
     );
     teamMsg(`Token ${r.token}\n${lines.join("\n")}`);
     const latest = r.attempts[r.attempts.length - 1];
@@ -1003,11 +1032,14 @@
 
   function wire() {
     $("#startForm").addEventListener("submit", onStart);
-    $("#token").addEventListener("input", (e) => {
-      const el = e.target;
-      const v = el.value.replace(/\s+/g, "").toUpperCase();
-      if (v !== el.value) el.value = v;
-    });
+    // Tokens are numbers only: anything else is dropped as it's typed.
+    for (const id of ["#token", "#tToken"]) {
+      $(id).addEventListener("input", (e) => {
+        const el = e.target;
+        const v = el.value.replace(/\D+/g, "");
+        if (v !== el.value) el.value = v;
+      });
+    }
     $("#yesBtn").addEventListener("click", () => decide("Yes", "right"));
     $("#noBtn").addEventListener("click", () => decide("No", "left"));
     $("#crushBtn").addEventListener("click", crushTap);
@@ -1019,6 +1051,9 @@
     $("#nextBtn").addEventListener("click", (e) => {
       e.stopPropagation();
       next();
+    });
+    $("#result").addEventListener("click", () => {
+      if ($("#result").dataset.answer !== "crush") next();
     });
     $("#cookie").addEventListener("click", crackCookie);
     $("#halfBtn").addEventListener("click", halfBtn);
@@ -1057,7 +1092,7 @@
         return;
       }
       if (S && S.phase === "result" && !$("#result").hidden) {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === "Enter" || e.key === " " || (e.key === "ArrowRight" && $("#result").dataset.answer !== "crush")) {
           e.preventDefault();
           next();
         } else if (e.key === "Backspace" || e.key === "Delete") {
@@ -1105,11 +1140,11 @@
         show("play");
         renderPlay();
         showHalftime();
-      } else if (p === "result" && S.last && S.last.answer === CRUSH) {
+      } else if (p === "result" && S.last && S.last.answer !== "No") {
         S.index = S.last.index;
         show("play");
         renderPlay();
-        showResult(CARDS[S.last.index]);
+        showResult(CARDS[S.last.index], S.last.answer);
       } else {
         S.index = Math.min(S.index ?? firstUnanswered(), CARDS.length - 1);
         if (S.answers[CARDS[S.index].id]) S.index = firstUnanswered();

@@ -27,7 +27,7 @@ The game is a website on GitHub Pages. Every swipe goes to the Google Sheet **Sw
 
 ## 1b. Updating the Apps Script to a new version of Code.gs
 
-Do this whenever Code.gs in this repo changes (for example the column reorder of 29 Oct).
+Do this whenever Code.gs in this repo changes (29 Oct: column reorder; later on 29 Oct: numbers-only tokens and one device per token).
 
 1. Open `apps-script/Code.gs` in this repo on GitHub. Click the **copy icon** (two squares, top right of the code). The whole file is copied.
 2. Open the sheet **Swipe Game Responses** → **Extensions → Apps Script**.
@@ -76,11 +76,11 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 | `fanStickers` | Stickers on the 3 cards of the start screen |
 | `rounds` → `1` / `2` | Round title flash, the question, the card banner, the yes/no meanings. `flashSeconds` = how long the round title stays up |
 | `buttons` | Yes / No / Desi Crush / Undo labels |
-| `results` | The Desi Crush screen |
+| `results` | The match screen after Yes, and the Desi Crush screen. `minSeconds` / `maxSeconds` = how long the match screen stays before moving on |
 | `moveCrush` | The "Move your Desi Crush?" box |
 | `profileButton`, `profileLabels` | The "See full profile" sheet |
 | `halftime`, `fortunes` | Fortune cookie (off; `show: true` turns it on, between round 1 and 2) |
-| `done`, `profiles` | End screen and the 5 food personalities |
+| `done`, `profiles` | End screen, the random "perfect match" line, and the 5 food personalities |
 | `messages` | Error and info messages |
 | `CARDS` (bottom half) | Every dish: name, bio, tags, flags, twist, photos |
 
@@ -90,7 +90,7 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 
 | Column | Meaning |
 |---|---|
-| Token, Age, Gender | From the start screen. Tokens ignore spaces, capitals and leading zeros: `09`, `9` and ` 9 ` are one token; `a1` and `A1` are one token. |
+| Token, Age, Gender | From the start screen. Tokens are numbers only. Spaces and leading zeros are ignored: `09`, `9` and ` 9 ` are one token. |
 | Attempt | 1 for the first game. 2+ only after a team member allows a replay or a restart. |
 | Status | In progress, Completed, Replay allowed (not started yet), Restarted (unfinished). |
 | Duplicate | Empty for a first game. `YES (replay…)` or `Restart (…)` for extra attempts. |
@@ -98,7 +98,7 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 | Yes total, Super Likes | Filled when the game is completed. Yes total includes the Desi Crush. |
 | Undos | Times the player changed an answer. Moving the Desi Crush to another cuisine also adds 1. |
 | Profile type | The fun end-of-game profile they were shown. |
-| Device, Notes | Which device started the game; team notes for overrides. |
+| Device, Notes | Which device started the game (only that device can carry on with it); team notes for overrides. |
 
 For analysis, use rows with **Status = Completed**. Decide whether to keep or drop rows where Duplicate is filled.
 
@@ -115,7 +115,9 @@ For analysis, use rows with **Status = Completed**. Decide whether to keep or dr
   - Red: no internet. Answers stay on the device and send themselves when the internet is back. Don't clear the browser data while it's red.
 - **Team tools** (allow a replay, restart a token): tap the **game name/logo at the top left 5 times quickly**. A panel opens. Enter your name, the stall PIN and the token, then **Check token**.
 - **Same token twice:** the game says "already played". To allow another go: Team tools → Check token → **Allow a replay** with a reason.
-- **Player walked away mid-game:** tap **Exit** (top right). The same token carries on later from where it stopped, on any device. To start that token from dish 1 instead: Team tools → Check token → **Restart unfinished game**.
+- **Player walked away mid-game:** tap **Exit** (top right). The same token carries on later from where it stopped, **on the same device**.
+- **"Token X is already playing on another device":** that token's game is still open on another laptop, iPad or phone. Finish it there. If that device died or is busy: Team tools → Check token (it shows which device has it) → **Restart unfinished game**. The token then starts from dish 1 on any device.
+- **Don't clear browser history or site data on the game devices** during the fest. The device would look new and be locked out of its own unfinished game (fix: Restart unfinished game).
 - **Something looks stuck:** reload the page. The game resumes where it was. Team tools also has **Reload page**.
 
 ## Testing changes locally

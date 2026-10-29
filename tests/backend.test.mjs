@@ -98,16 +98,34 @@ test("a finished token is blocked; 007 and 7 are the same token", () => {
   assert.equal(be.sheet("Players").rows().length, 1);
 });
 
-test("an unfinished token continues with its saved answers", () => {
+test("an unfinished token continues with its saved answers on the same device", () => {
   const be = createBackend(CODE);
   startNew(be, "40");
   be.call({ action: "answer", token: "40", attempt: 1, card: "dosa", answer: "Yes", rid: rid() });
   be.call({ action: "answer", token: "40", attempt: 1, card: "samosa", answer: "No", rid: rid() });
-  const r = be.call({ action: "start", token: "40", age: 30, gender: "Male", device: "Laptop-X", rid: rid() });
+  const r = be.call({ action: "start", token: "40", age: 30, gender: "Male", device: "iPad-TEST", rid: rid() });
   assert.equal(r.state, "resume");
   assert.deepEqual(r.answers, { dosa: "Yes", samosa: "No" });
   assert.equal(r.age, 21, "keeps the age entered first");
   assert.equal(be.sheet("Players").rows().length, 1);
+});
+
+test("a token being played on one device can't be opened on another", () => {
+  const be = createBackend(CODE);
+  startNew(be, "41"); // iPad-TEST
+  const r = be.call({ action: "start", token: "041", age: 30, gender: "Male", device: "Phone-ZZ", rid: rid() });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, "in_use");
+  assert.equal(r.token, "41");
+  assert.equal(be.sheet("Players").rows().length, 1, "no new row");
+  assert.match(be.sheet("Swipe log").rows().at(-1)["Answer or action"], /Blocked: already playing on iPad-TEST/);
+  // Team restart frees the token for any device, from dish 1.
+  be.call({ action: "team_restart", pin: "4321", token: "41", name: "Aman", reason: "Laptop battery died", rid: rid() });
+  const s = be.call({ action: "start", token: "41", age: 30, gender: "Male", device: "Phone-ZZ", rid: rid() });
+  assert.equal(s.ok, true);
+  assert.equal(s.attempt, 2);
+  const chk = be.call({ action: "team_check", pin: "4321", token: "41", rid: rid() });
+  assert.equal(chk.attempts[1].device, "Phone-ZZ", "team check shows the device");
 });
 
 test("first answer wins; a repeat request writes nothing new", () => {
@@ -217,23 +235,27 @@ test("bad input is rejected cleanly", () => {
   const be = createBackend(CODE);
   assert.equal(JSON.parse(be.raw("not json")).code, "bad_request");
   assert.equal(be.call({ action: "start", token: "bad token!", age: 20, rid: rid() }).ok, false);
+  assert.equal(be.call({ action: "start", token: "AB", age: 20, rid: rid() }).ok, false);
   assert.equal(be.call({ action: "start", token: "1", age: 200, rid: rid() }).ok, false);
   assert.equal(be.call({ action: "nope" }).code, "bad_request");
   assert.equal(be.get().ok, true);
 });
 
-test("an alphanumeric token like 1E5 stays text in the sheet", () => {
+test("tokens are numbers only; letters and symbols are refused", () => {
   const be = createBackend(CODE);
-  startNew(be, "1e5");
-  assert.equal(be.sheet("Players").rows()[0].Token, "1E5");
-  assert.equal(startNew(be, "1E5").state, "resume");
+  for (const t of ["A1", "1e5", "12-3", "7!", "", "１２"]) {
+    const r = startNew(be, t);
+    if (t === "１２") assert.equal(r.token, "12", "full-width digits count as digits");
+    else assert.equal(r.ok, false, `refused: ${JSON.stringify(t)}`);
+  }
 });
 
-test("tokens ignore case, spaces and leading zeros: a1 = A1, 09 = 9", () => {
+test("tokens ignore spaces and leading zeros: 09 = 9 = ' 9 ', 01 = 1", () => {
   const be = createBackend(CODE);
-  startNew(be, "a1");
-  assert.equal(startNew(be, " A 1 ").state, "resume");
   startNew(be, "09");
   assert.equal(startNew(be, "9").state, "resume");
-  assert.deepEqual(be.sheet("Players").rows().map((r) => String(r.Token)), ["A1", "9"]);
+  assert.equal(startNew(be, " 9 ").state, "resume");
+  startNew(be, "1");
+  assert.equal(startNew(be, "01").state, "resume");
+  assert.deepEqual(be.sheet("Players").rows().map((r) => String(r.Token)), ["9", "1"]);
 });

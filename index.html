@@ -47,7 +47,7 @@
           <h2 data-text="startHeading"></h2>
           <label class="field">
             <span data-text="tokenLabel"></span>
-            <input id="token" name="token" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" required>
+            <input id="token" name="token" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" maxlength="9" required>
             <small data-text="tokenHelp"></small>
           </label>
           <label class="field">
@@ -88,7 +88,6 @@
         </div>
         <div class="deck-area">
           <div class="deck" id="deck"></div>
-          <div class="burst deck-burst" id="deckBurst" aria-hidden="true"></div>
           <div class="controls">
             <button class="ctl ctl-undo" id="undoBtn" type="button"><svg><use href="#i-undo"/></svg><span data-btn="undo"></span></button>
             <button class="ctl ctl-no" id="noBtn" type="button"><svg><use href="#i-no"/></svg><span data-btn="no"></span></button>
@@ -104,6 +103,14 @@
           <p class="profile-kicker" id="doneKicker"></p>
           <h2 id="profileName"></h2>
           <p id="profileLine"></p>
+          <div class="match" aria-live="polite">
+            <div class="match-photo-wrap" id="matchPhoto"></div>
+            <div class="match-text">
+              <p class="match-kicker"><svg><use href="#i-yes"/></svg><span id="matchKicker"></span></p>
+              <p class="match-name" id="matchName"></p>
+              <p class="match-line" id="matchLine"></p>
+            </div>
+          </div>
           <dl class="stats" id="stats"></dl>
           <button class="btn-primary btn-big" id="nextPlayerBtn" type="button"></button>
         </div>
@@ -120,17 +127,20 @@
     <p class="flash-crush" id="flashCrush" hidden></p>
   </div>
 
-  <!-- Desi Crush screen (Yes and No have no screen) -->
+  <!-- Match screen after Yes (moves on by itself) or Desi Crush (waits for Next). No has no screen. -->
   <div class="overlay" id="result" hidden>
     <div class="result" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
       <h2 class="result-title" id="resultTitle"></h2>
       <div class="plates" id="plates"></div>
       <p class="result-name" id="resultName"></p>
       <p class="result-line" id="resultLine"></p>
+      <ul class="teasers" id="teasers"></ul>
       <div class="result-actions">
         <button class="btn-primary btn-big" id="nextBtn" type="button"></button>
         <button class="btn-quiet" id="changeBtn" type="button"><svg><use href="#i-undo"/></svg><span id="changeText"></span></button>
       </div>
+      <div class="timer" id="timer" aria-hidden="true"><span></span></div>
+      <p class="tap-hint-result" id="tapHint"></p>
     </div>
     <div class="burst" id="burst" aria-hidden="true"></div>
   </div>
@@ -194,7 +204,7 @@
       <form id="teamForm" class="team-grid" novalidate>
         <label class="field"><span>Your name</span><input id="tName" autocomplete="off" maxlength="40"></label>
         <label class="field"><span>Stall PIN</span><input id="tPin" type="password" autocomplete="off" maxlength="40"></label>
-        <label class="field"><span>Token</span><input id="tToken" autocomplete="off" autocapitalize="characters" maxlength="20"></label>
+        <label class="field"><span>Token</span><input id="tToken" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="9"></label>
         <button class="btn-primary" id="tCheck" type="submit">Check token</button>
       </form>
       <div id="tResult" class="team-result" role="status"></div>

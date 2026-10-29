@@ -9,7 +9,10 @@
  * - Saves every swipe the moment it happens (Players tab + Swipe log tab).
  * - Blocks a token that has already finished. A team member can allow a replay
  *   with the stall PIN; the replay gets its own row marked in "Duplicate".
- * - Lets an unfinished game continue after a reload, or on another device.
+ * - Lets an unfinished game continue after a reload on the same device. Another
+ *   device can't open a token that is still being played (a team member can
+ *   restart it instead).
+ * - Tokens are numbers only; 007 and 7 are the same token.
  * - Never deletes rows. Restarts and replays add new rows and are written to
  *   the Overrides tab with the team member's name and reason.
  */
@@ -116,7 +119,7 @@ function handle(b) {
 
 function start(b) {
   const token = normToken(b.token);
-  if (!token) return bad("Enter a valid token (letters and numbers only).");
+  if (!token) return bad("Enter a valid token (numbers only).");
   const age = parseInt(b.age, 10);
   if (!(age >= 5 && age <= 99)) return bad("Enter an age between 5 and 99.");
   const gender = clip(b.gender, 30);
@@ -134,6 +137,12 @@ function start(b) {
 
   const status = latest.values[P.STATUS];
   if (status === STATUS.PLAYING) {
+    // Only the device that started the game can carry on with it.
+    const owner = String(latest.values[C.DEVICE] || "");
+    if (owner && device && owner !== device) {
+      log(token, latest.attempt, "", "", "Blocked: already playing on " + owner, device, b.rid);
+      return { ok: false, code: "in_use", token: token, message: "Token " + token + " is already playing on another device." };
+    }
     log(token, latest.attempt, "", "", "Continued", device, b.rid);
     return {
       ok: true, state: "resume", token: token, attempt: latest.attempt,
@@ -222,6 +231,7 @@ function teamCheck(b) {
     attempt: a.attempt,
     status: a.values[P.STATUS],
     duplicate: a.values[P.DUP],
+    device: String(a.values[C.DEVICE] || ""),
     answered: CARDS.filter((c, i) => String(a.values[P.FIRST_CARD + i] || "")).length,
     started: String(a.values[P.STARTED] || ""),
     finished: String(a.values[P.FINISHED] || ""),
@@ -263,7 +273,7 @@ function teamRestart(b) {
   setCell(sh, latest.row, C.NOTES, appendNote(latest.values[C.NOTES], "Restarted. " + note));
   sh.appendRow(newRow(token, next, STATUS.ALLOWED, "Restart (attempt " + latest.attempt + " unfinished)", "", "", "", "", note));
   override(token, "Restarted an unfinished game", b, latest.attempt, next);
-  return { ok: true, token: token, attempt: next, message: "Token " + token + " can start again from dish 1 (attempt " + next + ")." };
+  return { ok: true, token: token, attempt: next, message: "Token " + token + " can start again from dish 1 (attempt " + next + "), on any device." };
 }
 
 function checkPin(b) {
@@ -307,10 +317,11 @@ function bad(message) {
   return { ok: false, code: "invalid", message: message };
 }
 
+// Tokens are numbers only. 007 and 7 are the same token.
 function normToken(t) {
-  let s = String(t == null ? "" : t).normalize("NFKC").replace(/\s+/g, "").toUpperCase();
-  if (/^\d+$/.test(s)) s = s.replace(/^0+(?=\d)/, ""); // 007 and 7 are the same token
-  return /^[A-Z0-9-]{1,20}$/.test(s) ? s : "";
+  const s = String(t == null ? "" : t).normalize("NFKC").replace(/\s+/g, "");
+  if (!/^\d{1,9}$/.test(s)) return "";
+  return s.replace(/^0+(?=\d)/, "");
 }
 
 function cardIndex(id) {

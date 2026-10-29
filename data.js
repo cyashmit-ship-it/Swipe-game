@@ -16,22 +16,22 @@ const GAME = {
 
   // ---------------------------------------------------------------- start screen
   title: "Is It a Match?", // WORKING TITLE — to be decided
-  intro: "Ten dishes, each with a twist. Swipe right if you'd try it, left if you'd pass. Takes about a minute.",
+  intro: "Ten dishes are on the app tonight. Swipe right if you'd try them with a twist, left to keep them classic. Takes about a minute.",
   startHeading: "Create your profile",
   tokenLabel: "Token number",
-  tokenHelp: "It's on your slip.",
+  tokenHelp: "Numbers only, as on your slip. For example 7 or 07.",
   ageLabel: "Your age",
   genderLabel: "Gender",
   startButton: "Start swiping",
   // The three "how it works" lines on the start screen.
   howTo: [
-    { icon: "yes", text: "Swipe right or tap Yes if you'd try it." },
-    { icon: "no", text: "Swipe left or tap No if you'd pass." },
+    { icon: "yes", text: "Swipe right or tap Yes if you'd try the dish with a twist." },
+    { icon: "no", text: "Swipe left or tap No to keep it the original way." },
     { icon: "crush", text: "Round 2: one Desi Crush for your favourite cuisine." },
   ],
   // Little stickers on the three cards on the start page (shown on hover or tap)
   fanStickers: [
-    { stamp: "YES", line: "Schezwan dosa? Why not." },
+    { stamp: "YES", line: "Chinese-style? Why not." },
     { stamp: "DESI CRUSH", line: "Korean, but make it desi." },
     { stamp: "NOPE", line: "Some classics stay classic." },
   ],
@@ -42,11 +42,10 @@ const GAME = {
     1: {
       emoji: "🥢",
       tag: "Round 1: Chinese twist",
-      question: "Would you try this Chinese twist?",
-      cardBanner: "Would you try it?",
-      twistOf: "Twist on {name}", // small line under the dish name
-      yesMeans: "Yes, I'd try it",
-      noMeans: "No, I'd pass",
+      question: "Would you try this dish Chinese-style?",
+      cardBanner: "Would you try it Chinese-style?",
+      yesMeans: "Yes, I'd try the Chinese twist",
+      noMeans: "No, keep it Indian",
       flashTitle: "Round 1",
       flashText: "Indian dishes with a Chinese twist.",
       flashSeconds: 1.5,
@@ -54,10 +53,9 @@ const GAME = {
     2: {
       emoji: "🌶️",
       tag: "Round 2: Desi twist",
-      question: "Would you try this cuisine made desi?",
+      question: "Would you try this cuisine desi-style?",
       cardBanner: "Would you try it desi-style?",
-      madeDesi: "{from}, made desi", // small line under the cuisine name
-      yesMeans: "Yes, make it desi",
+      yesMeans: "Yes, give it an Indian twist",
       noMeans: "No, keep it original",
       crushMeans: "Desi Crush = your favourite (only one)",
       flashTitle: "Round 2",
@@ -70,12 +68,18 @@ const GAME = {
   // ---------------------------------------------------------------- buttons
   buttons: { no: "No", yes: "Yes", crush: "Desi Crush", undo: "Undo" },
 
-  // ---------------------------------------------------------------- Desi Crush screen
-  // Yes and No have no screen: the card flies off and the next one comes in.
+  // ---------------------------------------------------------------- match screen (after Yes or Desi Crush)
+  // After a Yes, the twist slides in and the screen moves on by itself after
+  // minSeconds to maxSeconds (longer text = longer). A tap skips it.
+  // The Desi Crush screen waits for Next. A No has no screen: the next card comes in.
   results: {
+    match: "It's a match!",
     crush: "Desi crush!",
-    crushName: "{name}, the desi way",
-    crushLine: "Your favourite to make desi. You can move it to another cuisine later.",
+    desiName: "{name}, the desi way",
+    teaserIntro: "On your first date, you might get:",
+    minSeconds: 2,
+    maxSeconds: 3.5,
+    tapHint: "Tap anywhere to continue",
     next: "Next",
     last: "See my food profile",
     change: "Change my answer",
@@ -129,6 +133,9 @@ const GAME = {
     statCrush: "Desi crush",
     noCrush: "None",
     nextPlayer: "Next player",
+    // A random dish from the 15 twists, just for fun (not saved to the sheet).
+    matchKicker: "Your perfect match",
+    matchLine: "{name} swiped right on you too.",
   },
   // Profile type, picked by the number of Yes + Desi Crush answers (out of 10).
   profiles: [
@@ -144,12 +151,13 @@ const GAME = {
     welcomeBack: "Welcome back. Carrying on from dish {n} of 10.",
     undone: "Answer removed. Swipe again.",
     noToken: "Enter the token number from your slip.",
-    badToken: "Tokens use letters and numbers only.",
+    badToken: "The token is a number only, like 7 or 15.",
     badAge: "Enter your age (5 to 99).",
     noGender: "Choose a gender option.",
     checking: "One moment…",
     offline: "Couldn't connect. Check the internet, then tap Start again.",
     used: "Token {token} has already played. Please check with the stall team.",
+    inUse: "Token {token} is already playing on another device. Please check with the stall team.",
     restarted: "This game was restarted by the stall team. Enter the token again to start fresh.",
     exitTitle: "Leave this game?",
     exitText: "You can pick up where you left off with the same token.",
@@ -165,9 +173,10 @@ const GAME = {
 //  Photos: file names are listed in images/README.md.
 //  spice: 1 = mild, 2 = medium, 3 = hot.
 //
-//  Round 1 card: the big photo and name are the TWIST (Schezwan Dosa).
-//  The original dish (Masala Dosa) shows as a small photo under it.
-//  Round 2 card: the two photos are the desi versions of that cuisine.
+//  Round 1: the card shows the original dish. After a Yes, the twist
+//  (name, line, photo) slides in on the match screen.
+//  Round 2: the card shows the cuisine. After a Yes, its two desi dishes
+//  (desi: name + photo) show on the match screen.
 // ---------------------------------------------------------------------
 
 const CARDS = [
@@ -179,7 +188,7 @@ const CARDS = [
     from: "Bengaluru",
     bio: "Crispy on the outside, soft potato heart inside.",
     chips: ["Crispy", "Breakfast hero", "Comes with sambar"],
-    spice: 2,
+    spice: 1,
     lookingFor: "Someone who appreciates a good crunch.",
     madeOf: "Rice and lentil batter, spiced potato, ghee.",
     greenFlag: "Always shows up with sambar and two chutneys.",
@@ -239,7 +248,7 @@ const CARDS = [
     from: "Delhi",
     bio: "Delhi's favourite protein, straight off the tandoor.",
     chips: ["Smoky", "Protein-packed", "Tandoori"],
-    spice: 3,
+    spice: 2,
     lookingFor: "A gym buddy who loves a cheat meal.",
     madeOf: "Soya chunks, creamy marinade, tandoori masala.",
     greenFlag: "High protein, zero guilt.",
@@ -287,9 +296,10 @@ const CARDS = [
     greenFlag: "Always brings free side dishes.",
     redFlag: "Kimchi breath.",
     funFact: "South Koreans eat more instant noodles per person than almost anyone.",
-    photos: [
-      { src: "images/korean-desi-1.jpg", emoji: "🍗", caption: "Butter-chicken Korean fried chicken" },
-      { src: "images/korean-desi-2.jpg", emoji: "🍜", caption: "Masala ramyeon with jeera tadka" },
+    photos: [{ src: "images/korean.jpg", emoji: "🍗", caption: "Korean fried chicken" }],
+    desi: [
+      { name: "Butter-chicken glazed Korean fried chicken", photo: { src: "images/korean-desi-1.jpg", emoji: "🍗", caption: "Butter-chicken glazed Korean fried chicken" } },
+      { name: "Masala ramyeon with a jeera tadka", photo: { src: "images/korean-desi-2.jpg", emoji: "🍜", caption: "Masala ramyeon with a jeera tadka" } },
     ],
   },
   {
@@ -305,9 +315,10 @@ const CARDS = [
     greenFlag: "Cheese on everything.",
     redFlag: "Will judge you for breaking spaghetti.",
     funFact: "Italy has hundreds of pasta shapes.",
-    photos: [
-      { src: "images/italian-desi-1.jpg", emoji: "🍝", caption: "Makhani pasta" },
-      { src: "images/italian-desi-2.jpg", emoji: "🍕", caption: "Achari paneer pizza" },
+    photos: [{ src: "images/italian.jpg", emoji: "🍝", caption: "Pasta in tomato-basil sauce" }],
+    desi: [
+      { name: "Makhani pasta", photo: { src: "images/italian-desi-1.jpg", emoji: "🍝", caption: "Makhani pasta" } },
+      { name: "Achari paneer pizza", photo: { src: "images/italian-desi-2.jpg", emoji: "🍕", caption: "Achari paneer pizza" } },
     ],
   },
   {
@@ -323,9 +334,10 @@ const CARDS = [
     greenFlag: "Balances sweet, sour, salty and spicy.",
     redFlag: "'Medium spicy' is a lie.",
     funFact: "Thai green curry gets its colour from fresh green chillies.",
-    photos: [
-      { src: "images/thai-desi-1.jpg", emoji: "🍛", caption: "Curry-leaf green curry with appam" },
-      { src: "images/thai-desi-2.jpg", emoji: "🍜", caption: "Pad Thai chaat with imli chutney" },
+    photos: [{ src: "images/thai.jpg", emoji: "🍛", caption: "Thai green curry" }],
+    desi: [
+      { name: "Green curry with curry leaves, served with appam", photo: { src: "images/thai-desi-1.jpg", emoji: "🍛", caption: "Green curry with curry leaves, served with appam" } },
+      { name: "Pad Thai chaat with imli chutney", photo: { src: "images/thai-desi-2.jpg", emoji: "🍜", caption: "Pad Thai chaat with imli chutney" } },
     ],
   },
   {
@@ -341,9 +353,10 @@ const CARDS = [
     greenFlag: "Always comes with lime and salsa.",
     redFlag: "Things get messy fast.",
     funFact: "Mexico grows dozens of different chilli varieties.",
-    photos: [
-      { src: "images/mexican-desi-1.jpg", emoji: "🌮", caption: "Tandoori paneer tacos" },
-      { src: "images/mexican-desi-2.jpg", emoji: "🌯", caption: "Rajma-chawal burrito" },
+    photos: [{ src: "images/mexican.jpg", emoji: "🌮", caption: "Tacos" }],
+    desi: [
+      { name: "Tandoori paneer tacos", photo: { src: "images/mexican-desi-1.jpg", emoji: "🌮", caption: "Tandoori paneer tacos" } },
+      { name: "Rajma-chawal burrito", photo: { src: "images/mexican-desi-2.jpg", emoji: "🌯", caption: "Rajma-chawal burrito" } },
     ],
   },
   {
@@ -359,9 +372,10 @@ const CARDS = [
     greenFlag: "Beautifully presented, every time.",
     redFlag: "Wasabi ambush.",
     funFact: "Slurping your ramen is considered polite in Japan.",
-    photos: [
-      { src: "images/japanese-desi-1.jpg", emoji: "🍣", caption: "Tandoori paneer sushi roll" },
-      { src: "images/japanese-desi-2.jpg", emoji: "🍜", caption: "Rasam ramen" },
+    photos: [{ src: "images/japanese.jpg", emoji: "🍣", caption: "Sushi" }],
+    desi: [
+      { name: "Tandoori paneer sushi roll", photo: { src: "images/japanese-desi-1.jpg", emoji: "🍣", caption: "Tandoori paneer sushi roll" } },
+      { name: "Rasam ramen", photo: { src: "images/japanese-desi-2.jpg", emoji: "🍜", caption: "Rasam ramen" } },
     ],
   },
 ];
