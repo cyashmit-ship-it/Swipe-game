@@ -25,6 +25,21 @@ The game is a website on GitHub Pages. Every swipe goes to the Google Sheet **Sw
 
 **If you change Code.gs later** (for example a new PIN): **Deploy → Manage deployments → pencil icon → Version: New version → Deploy**. The URL stays the same. A plain Save is not enough.
 
+## 1b. Updating the Apps Script to a new version of Code.gs
+
+Do this whenever Code.gs in this repo changes (for example the column reorder of 29 Oct).
+
+1. Open `apps-script/Code.gs` in this repo on GitHub. Click the **copy icon** (two squares, top right of the code). The whole file is copied.
+2. Open the sheet **Swipe Game Responses** → **Extensions → Apps Script**.
+3. Click inside the code. Press **Ctrl + A** (Mac: Cmd + A), then **Delete**. Press **Ctrl + V** to paste.
+4. Near the top, find `const VOLUNTEER_PIN = "CHANGE-ME";`. Change `CHANGE-ME` to your stall PIN (the same one as before). Keep the quotes.
+5. Press **Ctrl + S** to save. The orange dot next to the file name disappears.
+6. Click **Deploy → Manage deployments**. Click the **pencil icon**. Under **Version**, choose **New version**. Click **Deploy**. Then **Done**. The link stays the same, so `data.js` doesn't change.
+7. In the bar at the top, pick **setup** in the function list, then click **Run**. The log at the bottom says "Setup done". If the columns changed, it also says the old Players tab was renamed. Nothing is deleted.
+8. Check the sheet: a new **Players** tab with the new column order. The old one is now **Players (old layout)**.
+
+Do step 6 before step 7. Between them the game saves nothing to the sheet (answers wait on the device and the start screen says to run setup), so nothing can land in the wrong column. After step 7 the waiting answers send themselves.
+
 ## 2. Turn on the website
 
 Repo **Settings → Pages** → Source: **Deploy from a branch** → Branch: **main**, folder **/(root)** → **Save**.
@@ -36,11 +51,38 @@ See `images/README.md` for the 20 file names. Upload them into the `images` fold
 
 ## Changing the text
 
-Every word players see is in **`data.js`**. On GitHub: open `data.js` → click the **pencil icon** (top right of the file) → edit → green **Commit changes** button → **Commit changes** again. The site updates in about a minute; reload it to see the change.
+Every word players see is in **`data.js`**.
 
-- Change only the words between the quotation marks. Keep the quotes, commas and brackets.
-- Don't change the `id:` values or the order of the cards (the sheet columns depend on them).
-- Each section in `data.js` has a heading comment saying which screen it is for (start, how it works, rounds, results, halftime, end screen, messages, cards).
+1. Open the repo on GitHub and click **data.js**.
+2. Click the **pencil icon** (top right of the code: "Edit this file").
+3. Click inside the code and press **Ctrl + F** (Mac: Cmd + F). Type a few words of the text you want to change and press **Enter**. It jumps there.
+4. Change only the words **between the quotation marks**.
+   - Keep both quotes and the comma at the end of the line.
+   - Don't type a double quote `"` inside your text. Use a single quote `'`.
+   - Keep `{name}`, `{from}`, `{to}`, `{n}`, `{token}` where they are: the game fills them in.
+   - Don't change the `id:` or `part:` lines, or the order of the cards (the sheet columns depend on them).
+5. Click the green **Commit changes…** button (top right), then **Commit changes** in the box.
+6. Wait about a minute. The **Actions** tab shows a yellow dot while updating, a green tick when live.
+7. Reload the game: **Ctrl + Shift + R** on the laptop; on the iPad close the tab and open the link again.
+
+If the game shows a blank page after an edit, a quote or comma is broken. Open data.js again and fix it.
+
+**Where each text lives in data.js**
+
+| In data.js | On screen |
+|---|---|
+| `title`, `intro`, `startHeading`, `startButton` | Start screen |
+| `howTo` | The 3 "how it works" lines on the start screen |
+| `fanStickers` | Stickers on the 3 cards of the start screen |
+| `rounds` → `1` / `2` | Round title flash, the question, the card banner, the yes/no meanings. `flashSeconds` = how long the round title stays up |
+| `buttons` | Yes / No / Desi Crush / Undo labels |
+| `results` | The Desi Crush screen |
+| `moveCrush` | The "Move your Desi Crush?" box |
+| `profileButton`, `profileLabels` | The "See full profile" sheet |
+| `halftime`, `fortunes` | Fortune cookie (off; `show: true` turns it on, between round 1 and 2) |
+| `done`, `profiles` | End screen and the 5 food personalities |
+| `messages` | Error and info messages |
+| `CARDS` (bottom half) | Every dish: name, bio, tags, flags, twist, photos |
 
 ## What the sheet records
 
@@ -52,7 +94,7 @@ Every word players see is in **`data.js`**. On GitHub: open `data.js` → click 
 | Attempt | 1 for the first game. 2+ only after a team member allows a replay or a restart. |
 | Status | In progress, Completed, Replay allowed (not started yet), Restarted (unfinished). |
 | Duplicate | Empty for a first game. `YES (replay…)` or `Restart (…)` for extra attempts. |
-| P1 Masala Dosa … P2 Japanese | Yes, No or **Super Like**. "Super Like" is what the game now calls **Desi Crush** (world-cuisine round only, one per player). The columns are in game order and never move. |
+| P1 Masala Dosa … P2 Japanese | Yes, No or **Super Like**. "Super Like" is what the game calls **Desi Crush** (round 2 only, one per player). Columns are in play order: the 5 round-1 dishes, then the 5 cuisines. In round 1, "Yes" means yes to the twist shown on the card (for example Schezwan Dosa). |
 | Yes total, Super Likes | Filled when the game is completed. Yes total includes the Desi Crush. |
 | Undos | Times the player changed an answer. Moving the Desi Crush to another cuisine also adds 1. |
 | Profile type | The fun end-of-game profile they were shown. |
@@ -60,7 +102,7 @@ Every word players see is in **`data.js`**. On GitHub: open `data.js` → click 
 
 For analysis, use rows with **Status = Completed**. Decide whether to keep or drop rows where Duplicate is filled.
 
-**Swipe log**: every answer, undo, start and finish, with the time.
+**Swipe log**: every answer, undo, start and finish, with the time. "Card #" is the dish's position in the game (1–10).
 
 **Overrides**: every replay and restart, with the team member's name and reason.
 

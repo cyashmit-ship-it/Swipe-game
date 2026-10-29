@@ -22,18 +22,19 @@ const VOLUNTEER_PIN = "CHANGE-ME";
 
 const TZ = "Asia/Kolkata";
 
-// Fixed card order. Must match the ids in data.js.
-// The Players tab columns follow this order and never move.
+// Fixed card order: round 1 (Chinese twist), then round 2 (desi twist).
+// Must match the ids in data.js. The Players tab columns follow this order.
+// If you ever change this list, run setup once (see the bottom of this file).
 const CARDS = [
   ["dosa", "P1 Masala Dosa"],
   ["samosa", "P1 Samosa"],
+  ["bhel", "P1 Bhel Puri"],
+  ["chaap", "P1 Soya Chaap"],
+  ["pavbhaji", "P1 Pav Bhaji"],
   ["korean", "P2 Korean"],
   ["italian", "P2 Italian"],
-  ["bhel", "P1 Bhel Puri"],
   ["thai", "P2 Thai"],
-  ["chaap", "P1 Soya Chaap"],
   ["mexican", "P2 Mexican"],
-  ["pavbhaji", "P1 Pav Bhaji"],
   ["japanese", "P2 Japanese"],
 ];
 const ANSWERS = ["Yes", "No", "Super Like"];
@@ -374,8 +375,20 @@ function override(token, action, b, from, to) {
   tab("Overrides", OVR_HEADERS, 2).appendRow([now(), token, action, clip(b.name, 40), clip(b.reason, 200), from, to]);
 }
 
+// The Players tab, after checking its columns match this script. If they don't
+// (an older layout), nothing is written: answers wait on the game device and
+// are sent once setup has been run.
 function playersTab() {
-  return tab("Players", PLAYER_HEADERS, 1);
+  const sh = tab("Players", PLAYER_HEADERS, 1);
+  if (!headersMatch(sh)) throw new Error(LAYOUT_MSG);
+  return sh;
+}
+
+const LAYOUT_MSG = "The Players tab has an old column layout. Open Apps Script and run setup once.";
+
+function headersMatch(sh) {
+  const head = sh.getRange(1, 1, 1, PLAYER_HEADERS.length).getValues()[0].map(String);
+  return head.join("|") === PLAYER_HEADERS.join("|");
 }
 
 // Gets a tab, creating it with bold, frozen headers the first time.
@@ -403,10 +416,20 @@ function out(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// Run this once from the editor (select "setup", click Run) to create the tabs
-// and grant permissions before the fest.
+// Run this from the editor (select "setup", click Run) to create the tabs and
+// grant permissions. If the Players tab has an older column layout, it is
+// renamed (kept, never deleted) and a fresh Players tab is made.
 function setup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const old = ss.getSheetByName("Players");
+  if (old && old.getLastRow() > 0 && !headersMatch(old)) {
+    let name = "Players (old layout)";
+    for (let n = 2; ss.getSheetByName(name); n++) name = "Players (old layout " + n + ")";
+    old.setName(name);
+    console.log('Old Players tab renamed to "' + name + '". A new Players tab was created.');
+  }
   playersTab();
   tab("Swipe log", LOG_HEADERS, 2);
   tab("Overrides", OVR_HEADERS, 2);
+  console.log("Setup done. Players columns: " + CARDS.map((c) => c[1]).join(", "));
 }

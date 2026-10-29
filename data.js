@@ -2,6 +2,7 @@
 //  GAME CONTENT AND SETTINGS
 //  Every word players see is in this file. Change the text between the
 //  quotation marks, keep the quotes, commas and brackets as they are.
+//  {name}, {from}, {to}, {n}, {token} are filled in by the game: keep them.
 // =====================================================================
 
 const GAME = {
@@ -13,89 +14,80 @@ const GAME = {
   logo: "",
   background: "",
 
-  // ---------------------------------------------------------------- start
+  // ---------------------------------------------------------------- start screen
   title: "Is It a Match?", // WORKING TITLE — to be decided
-  intro:
-    "Ten dishes are on the app tonight. Some want a twist, some want to stay exactly as they are. " +
-    "Swipe right if you'd try the twist. Swipe left if you'd keep it classic.",
+  intro: "Ten dishes, each with a twist. Swipe right if you'd try it, left if you'd pass. Takes about a minute.",
   startHeading: "Create your profile",
   tokenLabel: "Token number",
   tokenHelp: "It's on your slip.",
   ageLabel: "Your age",
   genderLabel: "Gender",
   startButton: "Start swiping",
+  // The three "how it works" lines on the start screen.
+  howTo: [
+    { icon: "yes", text: "Swipe right or tap Yes if you'd try it." },
+    { icon: "no", text: "Swipe left or tap No if you'd pass." },
+    { icon: "crush", text: "Round 2: one Desi Crush for your favourite cuisine." },
+  ],
   // Little stickers on the three cards on the start page (shown on hover or tap)
   fanStickers: [
-    { stamp: "YES", line: "Chinese-style? Why not." },
+    { stamp: "YES", line: "Schezwan dosa? Why not." },
     { stamp: "DESI CRUSH", line: "Korean, but make it desi." },
     { stamp: "NOPE", line: "Some classics stay classic." },
   ],
 
-  // ---------------------------------------------------------------- how to play
-  howTo: {
-    title: "How it works",
-    steps: [
-      { icon: "yes", text: "Swipe right or tap Yes if you'd try the dish with a twist." },
-      { icon: "no", text: "Swipe left or tap No to keep it the original way." },
-      { icon: "crush", text: "In the world-cuisine round you get one Desi Crush. Give it to the cuisine you'd most love made desi. You can move it later." },
-    ],
-    example: "We're not asking if you like samosa. We're asking if you'd try a Chinese-style samosa.",
-    button: "Got it, let's swipe",
-  },
-
   // ---------------------------------------------------------------- rounds
+  // flashSeconds: how long the full-screen round title stays up.
   rounds: {
     1: {
       emoji: "🥢",
-      tag: "Chinese twist round",
-      question: "Would you try this dish Chinese-style?",
-      cardBanner: "Would you try it Chinese-style?",
-      yesMeans: "Yes, I'd try the Chinese twist",
-      noMeans: "No, keep it Indian",
-      flashTitle: "Chinese twist round",
-      flashText: "Indian dishes, made Chinese-style.",
+      tag: "Round 1: Chinese twist",
+      question: "Would you try this Chinese twist?",
+      cardBanner: "Would you try it?",
+      twistOf: "Twist on {name}", // small line under the dish name
+      yesMeans: "Yes, I'd try it",
+      noMeans: "No, I'd pass",
+      flashTitle: "Round 1",
+      flashText: "Indian dishes with a Chinese twist.",
+      flashSeconds: 1.5,
     },
     2: {
       emoji: "🌶️",
-      tag: "Desi twist round",
-      question: "Would you try this cuisine desi-style?",
+      tag: "Round 2: Desi twist",
+      question: "Would you try this cuisine made desi?",
       cardBanner: "Would you try it desi-style?",
-      yesMeans: "Yes, give it an Indian twist",
+      madeDesi: "{from}, made desi", // small line under the cuisine name
+      yesMeans: "Yes, make it desi",
       noMeans: "No, keep it original",
       crushMeans: "Desi Crush = your favourite (only one)",
-      flashTitle: "Desi twist round",
-      flashText: "World cuisines, made Indian.",
+      flashTitle: "Round 2",
+      flashText: "World cuisines with a desi twist.",
+      flashCrush: "You get one Desi Crush. Give it to your favourite.",
+      flashSeconds: 2.5,
     },
   },
 
-  // Shown once, before the first world-cuisine card.
-  plotTwist: {
-    title: "Plot twist!",
-    text: "Now cuisines from around the world are on the app. Would you try them with an Indian twist?",
-    crushNote: "You have one Desi Crush. Give it to the cuisine you'd love most made desi.",
-    button: "Show me",
-  },
-
-  // ---------------------------------------------------------------- buttons and results
+  // ---------------------------------------------------------------- buttons
   buttons: { no: "No", yes: "Yes", crush: "Desi Crush", undo: "Undo" },
+
+  // ---------------------------------------------------------------- Desi Crush screen
+  // Yes and No have no screen: the card flies off and the next one comes in.
   results: {
-    match: "It's a match!",
     crush: "Desi crush!",
-    classic: "Keeping it classic",
-    authentic: "Keeping it authentic",
-    desiName: "{name}, the desi way", // {name} becomes the cuisine name
-    teaserIntro: "On your first date, you might get:",
+    crushName: "{name}, the desi way",
+    crushLine: "Your favourite to make desi. You can move it to another cuisine later.",
     next: "Next",
     last: "See my food profile",
     change: "Change my answer",
-    tapHint: "Tap anywhere to continue",
   },
   moveCrush: {
     title: "Move your Desi Crush?",
-    text: "You gave it to {from}. Move it to {to}?", // {from} and {to} become cuisine names
+    text: "You gave it to {from}. Move it to {to}?",
     keep: "Keep it on {from}",
     move: "Move it",
   },
+
+  // ---------------------------------------------------------------- full profile (the "See full profile" button)
   profileButton: "See full profile",
   profileBack: "Back to swiping",
   profileLabels: {
@@ -108,8 +100,11 @@ const GAME = {
     funFact: "Fun fact",
   },
 
-  // ---------------------------------------------------------------- halftime surprise (after dish 5)
+  // ---------------------------------------------------------------- fortune cookie (switched off)
+  // To bring it back, change show: false to show: true.
+  // It then appears between round 1 and round 2.
   halftime: {
+    show: false,
     title: "Halftime!",
     text: "5 down, 5 to go. Crack your fortune cookie.",
     crack: "Crack it",
@@ -164,13 +159,19 @@ const GAME = {
 };
 
 // ---------------------------------------------------------------------
-//  CARDS — fixed order. Do not reorder or rename the ids: the results
-//  sheet columns follow this exact order (see apps-script/Code.gs).
+//  CARDS — played in this order: round 1 (part: 1), then round 2 (part: 2).
+//  Don't change the id or part lines: the results sheet columns follow
+//  this exact order (see apps-script/Code.gs).
 //  Photos: file names are listed in images/README.md.
 //  spice: 1 = mild, 2 = medium, 3 = hot.
+//
+//  Round 1 card: the big photo and name are the TWIST (Schezwan Dosa).
+//  The original dish (Masala Dosa) shows as a small photo under it.
+//  Round 2 card: the two photos are the desi versions of that cuisine.
 // ---------------------------------------------------------------------
 
 const CARDS = [
+  // ================================================ ROUND 1: Chinese twist
   {
     id: "dosa",
     part: 1,
@@ -178,7 +179,7 @@ const CARDS = [
     from: "Bengaluru",
     bio: "Crispy on the outside, soft potato heart inside.",
     chips: ["Crispy", "Breakfast hero", "Comes with sambar"],
-    spice: 1,
+    spice: 2,
     lookingFor: "Someone who appreciates a good crunch.",
     madeOf: "Rice and lentil batter, spiced potato, ghee.",
     greenFlag: "Always shows up with sambar and two chutneys.",
@@ -190,7 +191,6 @@ const CARDS = [
       line: "The same crispy dosa, spread with fiery Schezwan sauce and stuffed with veg noodles.",
       photo: { src: "images/dosa-chinese.jpg", emoji: "🌶️", caption: "Schezwan Dosa" },
     },
-    classicLine: "Masala Dosa stays just the way it is: crispy, golden, with sambar on the side.",
   },
   {
     id: "samosa",
@@ -211,47 +211,6 @@ const CARDS = [
       line: "A crispy samosa shell packed with chilli-garlic hakka noodles.",
       photo: { src: "images/samosa-chinese.jpg", emoji: "🍜", caption: "Noodle Samosa" },
     },
-    classicLine: "Samosa stays classic: spiced potato, peas and two chutneys.",
-  },
-  {
-    id: "korean",
-    part: 2,
-    name: "Korean",
-    from: "Seoul",
-    bio: "Bold, saucy and a little bit spicy. K-drama's favourite food.",
-    chips: ["Sweet-spicy", "Saucy", "Trending"],
-    spice: 3,
-    lookingFor: "A K-drama binge partner.",
-    famousFor: "Korean fried chicken, ramyeon, kimchi, bibimbap.",
-    greenFlag: "Always brings free side dishes.",
-    redFlag: "Kimchi breath.",
-    funFact: "South Koreans eat more instant noodles per person than almost anyone.",
-    photos: [
-      { src: "images/korean-1.jpg", emoji: "🍗", caption: "Korean Fried Chicken", line: "Double-fried and glazed in sweet-spicy gochujang." },
-      { src: "images/korean-2.jpg", emoji: "🍜", caption: "Ramyeon", line: "Fiery instant noodles, K-drama style." },
-    ],
-    teasers: ["Butter-chicken glazed Korean fried chicken", "Masala ramyeon with a jeera tadka"],
-    authenticLine: "Korean stays Korean: gochujang, kimchi and all.",
-  },
-  {
-    id: "italian",
-    part: 2,
-    name: "Italian",
-    from: "Rome",
-    bio: "Carbs, cheese and a lot of olive oil.",
-    chips: ["Cheesy", "Comforting", "Herby"],
-    spice: 1,
-    lookingFor: "Long dinners and longer conversations.",
-    famousFor: "Pasta, pizza, risotto, tiramisu.",
-    greenFlag: "Cheese on everything.",
-    redFlag: "Will judge you for breaking spaghetti.",
-    funFact: "Italy has hundreds of pasta shapes.",
-    photos: [
-      { src: "images/italian-1.jpg", emoji: "🍝", caption: "Pasta", line: "Penne in a rich tomato and basil sauce." },
-      { src: "images/italian-2.jpg", emoji: "🍕", caption: "Pizza", line: "Thin crust, mozzarella and fresh basil." },
-    ],
-    teasers: ["Makhani pasta", "Achari paneer pizza"],
-    authenticLine: "Italian stays Italian: olive oil, basil and parmesan.",
   },
   {
     id: "bhel",
@@ -272,27 +231,6 @@ const CARDS = [
       line: "Crispy fried noodles tossed with Schezwan sauce, cabbage and spring onion.",
       photo: { src: "images/bhel-chinese.jpg", emoji: "🥡", caption: "Chinese Bhel" },
     },
-    classicLine: "Bhel Puri stays classic: puffed rice, sev, tamarind and green chutney.",
-  },
-  {
-    id: "thai",
-    part: 2,
-    name: "Thai",
-    from: "Bangkok",
-    bio: "Fragrant and fresh, balancing sweet, sour and spicy.",
-    chips: ["Fragrant", "Coconut", "Zesty"],
-    spice: 3,
-    lookingFor: "Someone who can handle a little heat.",
-    famousFor: "Green curry, pad thai, tom yum, mango sticky rice.",
-    greenFlag: "Balances sweet, sour, salty and spicy.",
-    redFlag: "'Medium spicy' is a lie.",
-    funFact: "Thai green curry gets its colour from fresh green chillies.",
-    photos: [
-      { src: "images/thai-1.jpg", emoji: "🍛", caption: "Thai Green Curry", line: "Coconut curry with Thai basil and green chillies." },
-      { src: "images/thai-2.jpg", emoji: "🍜", caption: "Pad Thai", line: "Stir-fried rice noodles with peanuts and lime." },
-    ],
-    teasers: ["Green curry with curry leaves, served with appam", "Pad Thai chaat with imli chutney"],
-    authenticLine: "Thai stays Thai: lemongrass, basil and lime.",
   },
   {
     id: "chaap",
@@ -301,7 +239,7 @@ const CARDS = [
     from: "Delhi",
     bio: "Delhi's favourite protein, straight off the tandoor.",
     chips: ["Smoky", "Protein-packed", "Tandoori"],
-    spice: 2,
+    spice: 3,
     lookingFor: "A gym buddy who loves a cheat meal.",
     madeOf: "Soya chunks, creamy marinade, tandoori masala.",
     greenFlag: "High protein, zero guilt.",
@@ -313,27 +251,6 @@ const CARDS = [
       line: "Tossed in a sticky chilli-garlic sauce with peppers and onions.",
       photo: { src: "images/chaap-chinese.jpg", emoji: "🌶️", caption: "Chilli Soya Chaap" },
     },
-    classicLine: "Soya Chaap stays classic: smoky, creamy and fresh off the tandoor.",
-  },
-  {
-    id: "mexican",
-    part: 2,
-    name: "Mexican",
-    from: "Mexico City",
-    bio: "Big flavours, bigger fiestas.",
-    chips: ["Spicy", "Zingy", "Handheld"],
-    spice: 3,
-    lookingFor: "A fiesta every weekend.",
-    famousFor: "Tacos, burritos, nachos, guacamole.",
-    greenFlag: "Always comes with lime and salsa.",
-    redFlag: "Things get messy fast.",
-    funFact: "Mexico grows dozens of different chilli varieties.",
-    photos: [
-      { src: "images/mexican-1.jpg", emoji: "🌮", caption: "Tacos", line: "Soft tortillas with salsa and fillings." },
-      { src: "images/mexican-2.jpg", emoji: "🌯", caption: "Burrito", line: "A wrap stuffed with rice, beans and cheese." },
-    ],
-    teasers: ["Tandoori paneer tacos", "Rajma-chawal burrito"],
-    authenticLine: "Mexican stays Mexican: salsa, lime and jalapeños.",
   },
   {
     id: "pavbhaji",
@@ -354,7 +271,80 @@ const CARDS = [
       line: "Bhaji with a Schezwan swirl, pav toasted in chilli-garlic butter.",
       photo: { src: "images/pavbhaji-chinese.jpg", emoji: "🔥", caption: "Schezwan Pav Bhaji" },
     },
-    classicLine: "Pav Bhaji stays classic: a pool of butter, onions and lemon.",
+  },
+
+  // ================================================ ROUND 2: Desi twist
+  {
+    id: "korean",
+    part: 2,
+    name: "Korean",
+    from: "Seoul",
+    bio: "Bold, saucy and a little bit spicy. K-drama's favourite food.",
+    chips: ["Sweet-spicy", "Saucy", "Trending"],
+    spice: 3,
+    lookingFor: "A K-drama binge partner.",
+    famousFor: "Korean fried chicken, ramyeon, kimchi, bibimbap.",
+    greenFlag: "Always brings free side dishes.",
+    redFlag: "Kimchi breath.",
+    funFact: "South Koreans eat more instant noodles per person than almost anyone.",
+    photos: [
+      { src: "images/korean-desi-1.jpg", emoji: "🍗", caption: "Butter-chicken Korean fried chicken" },
+      { src: "images/korean-desi-2.jpg", emoji: "🍜", caption: "Masala ramyeon with jeera tadka" },
+    ],
+  },
+  {
+    id: "italian",
+    part: 2,
+    name: "Italian",
+    from: "Rome",
+    bio: "Carbs, cheese and a lot of olive oil.",
+    chips: ["Cheesy", "Comforting", "Herby"],
+    spice: 1,
+    lookingFor: "Long dinners and longer conversations.",
+    famousFor: "Pasta, pizza, risotto, tiramisu.",
+    greenFlag: "Cheese on everything.",
+    redFlag: "Will judge you for breaking spaghetti.",
+    funFact: "Italy has hundreds of pasta shapes.",
+    photos: [
+      { src: "images/italian-desi-1.jpg", emoji: "🍝", caption: "Makhani pasta" },
+      { src: "images/italian-desi-2.jpg", emoji: "🍕", caption: "Achari paneer pizza" },
+    ],
+  },
+  {
+    id: "thai",
+    part: 2,
+    name: "Thai",
+    from: "Bangkok",
+    bio: "Fragrant and fresh, balancing sweet, sour and spicy.",
+    chips: ["Fragrant", "Coconut", "Zesty"],
+    spice: 3,
+    lookingFor: "Someone who can handle a little heat.",
+    famousFor: "Green curry, pad thai, tom yum, mango sticky rice.",
+    greenFlag: "Balances sweet, sour, salty and spicy.",
+    redFlag: "'Medium spicy' is a lie.",
+    funFact: "Thai green curry gets its colour from fresh green chillies.",
+    photos: [
+      { src: "images/thai-desi-1.jpg", emoji: "🍛", caption: "Curry-leaf green curry with appam" },
+      { src: "images/thai-desi-2.jpg", emoji: "🍜", caption: "Pad Thai chaat with imli chutney" },
+    ],
+  },
+  {
+    id: "mexican",
+    part: 2,
+    name: "Mexican",
+    from: "Mexico City",
+    bio: "Big flavours, bigger fiestas.",
+    chips: ["Spicy", "Zingy", "Handheld"],
+    spice: 3,
+    lookingFor: "A fiesta every weekend.",
+    famousFor: "Tacos, burritos, nachos, guacamole.",
+    greenFlag: "Always comes with lime and salsa.",
+    redFlag: "Things get messy fast.",
+    funFact: "Mexico grows dozens of different chilli varieties.",
+    photos: [
+      { src: "images/mexican-desi-1.jpg", emoji: "🌮", caption: "Tandoori paneer tacos" },
+      { src: "images/mexican-desi-2.jpg", emoji: "🌯", caption: "Rajma-chawal burrito" },
+    ],
   },
   {
     id: "japanese",
@@ -370,10 +360,8 @@ const CARDS = [
     redFlag: "Wasabi ambush.",
     funFact: "Slurping your ramen is considered polite in Japan.",
     photos: [
-      { src: "images/japanese-1.jpg", emoji: "🍣", caption: "Sushi", line: "Vinegared rice rolls with fresh fillings." },
-      { src: "images/japanese-2.jpg", emoji: "🍜", caption: "Ramen", line: "Slow-cooked broth with noodles and egg." },
+      { src: "images/japanese-desi-1.jpg", emoji: "🍣", caption: "Tandoori paneer sushi roll" },
+      { src: "images/japanese-desi-2.jpg", emoji: "🍜", caption: "Rasam ramen" },
     ],
-    teasers: ["Tandoori paneer sushi roll", "Rasam ramen"],
-    authenticLine: "Japanese stays Japanese: soy, wasabi and ginger.",
   },
 ];

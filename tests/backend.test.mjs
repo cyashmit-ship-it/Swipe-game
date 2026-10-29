@@ -6,7 +6,15 @@ import { fileURLToPath } from "node:url";
 import { createBackend } from "./gas-mock.mjs";
 
 const CODE = fileURLToPath(new URL("../apps-script/Code.gs", import.meta.url));
-const IDS = ["dosa", "samosa", "korean", "italian", "bhel", "thai", "chaap", "mexican", "pavbhaji", "japanese"];
+const IDS = ["dosa", "samosa", "bhel", "chaap", "pavbhaji", "korean", "italian", "thai", "mexican", "japanese"];
+const NEW_HEAD = [
+  "P1 Masala Dosa", "P1 Samosa", "P1 Bhel Puri", "P1 Soya Chaap", "P1 Pav Bhaji",
+  "P2 Korean", "P2 Italian", "P2 Thai", "P2 Mexican", "P2 Japanese",
+];
+const OLD_HEAD = [
+  "P1 Masala Dosa", "P1 Samosa", "P2 Korean", "P2 Italian", "P1 Bhel Puri",
+  "P2 Thai", "P1 Soya Chaap", "P2 Mexican", "P1 Pav Bhaji", "P2 Japanese",
+];
 let n = 0;
 const rid = () => `r${++n}`;
 
@@ -22,16 +30,46 @@ function playAll(be, token, attempt, answers) {
 }
 const ALL_YES = IDS.map((_, i) => (i === 0 ? "Super Like" : i % 3 === 0 ? "No" : "Yes"));
 
-test("creates the three tabs with fixed headers in game order", () => {
+test("creates the three tabs with headers in play order: round 1, then round 2", () => {
   const be = createBackend(CODE);
   startNew(be);
   const head = be.sheet("Players").data[0];
-  assert.deepEqual(head.slice(8, 18), [
-    "P1 Masala Dosa", "P1 Samosa", "P2 Korean", "P2 Italian", "P1 Bhel Puri",
-    "P2 Thai", "P1 Soya Chaap", "P2 Mexican", "P1 Pav Bhaji", "P2 Japanese",
-  ]);
+  assert.deepEqual(head.slice(8, 18), NEW_HEAD);
   assert.ok(be.sheet("Swipe log"));
   assert.equal(be.sheets[0].getName(), "Players", "the empty first tab is reused");
+});
+
+test("old column layout: nothing is written until setup; setup keeps the old tab and makes a new one", () => {
+  const be = createBackend(CODE);
+  // A Players tab made by the previous script, with one test row.
+  const old = be.sheets[0];
+  old.setName("Players");
+  const oldHead = ["Token", "Attempt", "Status", "Duplicate", "Age", "Gender", "Started (IST)", "Finished (IST)", ...OLD_HEAD,
+    "Yes total (incl. Super Like)", "Super Likes", "Undos", "Profile type", "Device", "Notes"];
+  old.appendRow(oldHead);
+  old.appendRow(["TEST1", 1, "Completed", "", 22, "Male", "x", "y", "Yes", "No", "Yes", "Yes", "No", "Yes", "Yes", "No", "Yes", "No"]);
+
+  const refused = startNew(be, "60");
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "error", "the game retries later instead of losing the answer");
+  assert.match(refused.message, /run setup/);
+  assert.equal(old.data.length, 2, "nothing written into the old layout");
+
+  be.setup();
+  assert.equal(be.sheet("Players (old layout)"), old, "old tab kept under a new name");
+  assert.equal(old.data[1][0], "TEST1", "old rows untouched");
+  assert.deepEqual(be.sheet("Players").data[0].slice(8, 18), NEW_HEAD);
+  assert.match(be.logs.join("\n"), /renamed/);
+
+  assert.equal(startNew(be, "60").state, "new");
+  assert.equal(be.call({ action: "answer", token: "60", attempt: 1, card: "korean", answer: "Super Like", rid: rid() }).ok, true);
+  assert.equal(be.sheet("Players").rows()[0]["P2 Korean"], "Super Like");
+  const log = be.sheet("Swipe log").rows().find((l) => l.Card === "P2 Korean");
+  assert.equal(log["Card #"], 6, "Card # in the log is the play position");
+
+  be.setup(); // running it again changes nothing
+  assert.equal(be.sheets.filter((s) => /old layout/.test(s.getName())).length, 1);
+  assert.equal(be.sheet("Players").rows().length, 1);
 });
 
 test("a full game fills one row and completes it", () => {

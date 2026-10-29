@@ -101,7 +101,9 @@ export function createBackend(file, { pin = "4321" } = {}) {
     getSheets: () => sheets,
   };
   const cache = new Map();
+  const logs = [];
   const context = {
+    console: { log: (...a) => logs.push(a.join(" ")) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ss },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     CacheService: {
@@ -127,8 +129,10 @@ export function createBackend(file, { pin = "4321" } = {}) {
       return api.doPost({ postData: { contents: text } }).getContent();
     },
     get: () => JSON.parse(api.doGet().getContent()),
+    setup: () => api.setup(),
     sheet: (n) => ss.getSheetByName(n),
     sheets,
+    logs,
     clearCache: () => cache.clear(),
   };
 }

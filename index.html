@@ -40,6 +40,7 @@
           <img class="start-logo" id="startLogo" alt="" hidden>
           <h1 id="startTitle" data-text="title"></h1>
           <p class="intro" data-text="intro"></p>
+          <ul class="start-how" id="startHow"></ul>
           <div class="fan" id="fan"></div>
         </div>
         <form class="start-form" id="startForm" novalidate>
@@ -67,16 +68,6 @@
         </form>
       </section>
 
-      <!-- How it works -->
-      <section class="screen screen-how" id="screen-how" aria-labelledby="howTitle">
-        <div class="how-card">
-          <h2 id="howTitle"></h2>
-          <ol class="how-steps" id="howSteps"></ol>
-          <p class="how-example" id="howExample"></p>
-          <button class="btn-primary btn-big" id="howBtn" type="button"></button>
-        </div>
-      </section>
-
       <!-- Play -->
       <section class="screen screen-play" id="screen-play">
         <div class="prompt">
@@ -97,23 +88,13 @@
         </div>
         <div class="deck-area">
           <div class="deck" id="deck"></div>
+          <div class="burst deck-burst" id="deckBurst" aria-hidden="true"></div>
           <div class="controls">
             <button class="ctl ctl-undo" id="undoBtn" type="button"><svg><use href="#i-undo"/></svg><span data-btn="undo"></span></button>
             <button class="ctl ctl-no" id="noBtn" type="button"><svg><use href="#i-no"/></svg><span data-btn="no"></span></button>
             <button class="ctl ctl-crush" id="crushBtn" type="button"><svg><use href="#i-crush"/></svg><span data-btn="crush"></span><b class="crush-count" id="crushCount">1</b></button>
             <button class="ctl ctl-yes" id="yesBtn" type="button"><svg><use href="#i-yes"/></svg><span data-btn="yes"></span></button>
           </div>
-        </div>
-      </section>
-
-      <!-- Plot twist -->
-      <section class="screen screen-twist" id="screen-twist" aria-labelledby="twistTitle">
-        <div class="twist-inner">
-          <div class="fan fan-small" id="twistFan" aria-hidden="true"></div>
-          <h2 id="twistTitle"></h2>
-          <p id="twistText"></p>
-          <p class="twist-crush"><svg><use href="#i-crush"/></svg><span id="twistCrush"></span></p>
-          <button class="btn-primary btn-big" id="twistBtn" type="button"></button>
         </div>
       </section>
 
@@ -136,22 +117,20 @@
     <p class="flash-emoji" id="flashEmoji"></p>
     <p class="flash-title" id="flashTitle"></p>
     <p class="flash-text" id="flashText"></p>
+    <p class="flash-crush" id="flashCrush" hidden></p>
   </div>
 
-  <!-- Match / classic / desi crush result -->
+  <!-- Desi Crush screen (Yes and No have no screen) -->
   <div class="overlay" id="result" hidden>
     <div class="result" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
       <h2 class="result-title" id="resultTitle"></h2>
       <div class="plates" id="plates"></div>
       <p class="result-name" id="resultName"></p>
       <p class="result-line" id="resultLine"></p>
-      <ul class="teasers" id="teasers"></ul>
       <div class="result-actions">
         <button class="btn-primary btn-big" id="nextBtn" type="button"></button>
         <button class="btn-quiet" id="changeBtn" type="button"><svg><use href="#i-undo"/></svg><span id="changeText"></span></button>
       </div>
-      <div class="timer" id="timer" aria-hidden="true"><span></span></div>
-      <p class="tap-hint-result" id="tapHint"></p>
     </div>
     <div class="burst" id="burst" aria-hidden="true"></div>
   </div>

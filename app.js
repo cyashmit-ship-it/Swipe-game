@@ -12,12 +12,12 @@
   "use strict";
 
   const $ = (s, el = document) => el.querySelector(s);
-  const LS_STATE = "sg_state_v2";
+  const LS_STATE = "sg_state_v3"; // v3: rounds grouped (dishes 1-5, then cuisines 6-10)
   const LS_QUEUE = "sg_queue_v1";
   const LS_DEVICE = "sg_device_v1";
   const CRUSH = "Super Like"; // value written to the sheet for a Desi Crush
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const HALFTIME_AT = 5; // halftime pop-up appears before card 6
+  const HALFTIME_AT = 5; // fortune cookie (if switched on in data.js) appears before card 6
   const T = GAME;
 
   const fill = (s, vars = {}) => String(s).replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : ""));
@@ -168,11 +168,10 @@
   // ------------------------------------------------------------ game state
 
   // S = { token, attempt, age, gender, answers:{id:answer}, index, last, undos,
-  //       phase, crush, sawHow, seenTwist, sawHalftime, lastPart, profile }
+  //       phase, crush, sawHalftime, lastPart, profile }
   let S = store.get(LS_STATE, null);
   let busy = false; // a card is flying off
   let starting = false; // waiting for the token check
-  let resultTimer = null;
   const save = () => store.set(LS_STATE, S);
 
   const cardById = (id) => CARDS.find((c) => c.id === id);
@@ -218,8 +217,16 @@
     $("#exitConfirm").textContent = T.messages.exitLeave;
     $("#pBack").textContent = T.profileBack;
     $("#changeText").textContent = T.results.change;
-    $("#tapHint").textContent = T.results.tapHint;
     $("#crushMeans").textContent = T.rounds[2].crushMeans || "";
+    const how = $("#startHow");
+    how.innerHTML = "";
+    (T.howTo || []).forEach((s) => {
+      const li = document.createElement("li");
+      li.className = `how-${s.icon}`;
+      li.innerHTML = `<svg><use href="#i-${s.icon}"/></svg><span></span>`;
+      li.lastChild.textContent = s.text;
+      how.append(li);
+    });
   }
 
   // ------------------------------------------------------------ photos
@@ -342,48 +349,21 @@
       undos: 0,
       crush: Object.keys(answers).find((id) => answers[id] === CRUSH) || null,
       phase: "play",
-      sawHow: res.state === "resume",
       lastPart: null,
     };
     S.index = firstUnanswered();
-    S.seenTwist = S.index > CARDS.findIndex((c) => c.part === 2);
     S.sawHalftime = S.index > HALFTIME_AT;
     form.reset();
     busy = false;
     if (S.index >= CARDS.length) return finish();
     if (res.state === "resume") toast(fill(T.messages.welcomeBack, { n: S.index + 1 }), 3500);
-    if (!S.sawHow) return showHow();
     goToCard();
-  }
-
-  // ------------------------------------------------------------ how it works
-
-  function showHow() {
-    S.phase = "how";
-    save();
-    const H = T.howTo;
-    $("#howTitle").textContent = H.title;
-    const ol = $("#howSteps");
-    ol.innerHTML = "";
-    H.steps.forEach((s) => {
-      const li = document.createElement("li");
-      li.className = `how-${s.icon}`;
-      li.innerHTML = `<svg><use href="#i-${s.icon}"/></svg><span></span>`;
-      li.lastChild.textContent = s.text;
-      ol.append(li);
-    });
-    $("#howExample").textContent = H.example;
-    $("#howBtn").textContent = H.button;
-    document.body.dataset.part = "";
-    show("how");
-    renderProgress();
   }
 
   // ------------------------------------------------------------ play
 
   function goToCard() {
     const card = CARDS[S.index];
-    if (card.part === 2 && !S.seenTwist) return showTwist();
     S.phase = "play";
     save();
     show("play");
@@ -402,16 +382,24 @@
     $("#flashEmoji").textContent = R.emoji;
     $("#flashTitle").textContent = R.flashTitle;
     $("#flashText").textContent = R.flashText;
+    $("#flashCrush").textContent = R.flashCrush || "";
+    $("#flashCrush").hidden = !R.flashCrush;
     f.hidden = false;
     f.classList.remove("is-out");
     f.classList.remove("is-in");
     void f.offsetWidth;
     f.classList.add("is-in");
-    const skip = () => f.classList.add("is-out");
-    f.onclick = skip;
-    await wait(1400);
+    let skipped = false;
+    let wake = null;
+    f.onclick = () => {
+      skipped = true;
+      if (wake) wake();
+    };
+    // Stays up for flashSeconds (data.js), or until tapped.
+    await Promise.race([wait((Number(R.flashSeconds) || 1.5) * 1000), new Promise((r) => (wake = r))]);
+    f.onclick = null;
     f.classList.add("is-out");
-    await wait(350);
+    await wait(skipped ? 200 : 300);
     f.hidden = true;
     // Draw the eye to the question once the flash is gone.
     const q = $("#question");
@@ -461,13 +449,16 @@
     preload(nextCard);
   }
 
+  // Round 1: the twist is the profile (big photo + name); the original dish
+  // shows as a small photo under the name. Round 2: the two desi dishes share
+  // the photo area, each with its name.
   function cardEl(card, cls) {
     const R = T.rounds[card.part];
+    const p1 = card.part === 1;
     const el = document.createElement("article");
     el.className = `card part-${card.part} ${cls}`;
     el.dataset.id = card.id;
-    el.dataset.photo = "0";
-    el.setAttribute("aria-label", `${card.name}. ${card.bio}`);
+    el.setAttribute("aria-label", p1 ? `${card.twist.name}. ${card.twist.line}` : `${card.name}, made desi: ${card.photos.map((p) => p.caption).join(", ")}`);
 
     const banner = document.createElement("p");
     banner.className = "card-banner";
@@ -477,33 +468,17 @@
     el.append(banner);
 
     const photos = document.createElement("div");
-    photos.className = "card-photos";
-    if (card.photos.length > 1) {
-      const bars = document.createElement("div");
-      bars.className = "bars";
-      card.photos.forEach((_, i) => {
-        const b = document.createElement("span");
-        if (i === 0) b.className = "on";
-        bars.append(b);
-      });
-      photos.append(bars);
-    }
-    card.photos.forEach((p, i) => {
+    photos.className = `card-photos ${p1 ? "is-single" : "is-split"}`;
+    (p1 ? [card.twist.photo] : card.photos.slice(0, 2)).forEach((p) => {
       const ph = photoEl(p);
-      if (i > 0) ph.hidden = true;
+      if (!p1) {
+        const cap = document.createElement("span");
+        cap.className = "split-cap";
+        cap.textContent = p.caption;
+        ph.append(cap);
+      }
       photos.append(ph);
     });
-    if (card.photos.length > 1) {
-      const cap = document.createElement("p");
-      cap.className = "caption-pill";
-      cap.innerHTML = "<b></b><span></span>";
-      photos.append(cap);
-      setCaption(photos, card.photos[0]);
-      const hint = document.createElement("span");
-      hint.className = "tap-hint";
-      hint.textContent = `Tap photo: ${card.photos.length} dishes`;
-      photos.append(hint);
-    }
     const info = document.createElement("button");
     info.type = "button";
     info.className = "info-btn";
@@ -528,14 +503,24 @@
     const body = document.createElement("div");
     body.className = "card-info";
     body.innerHTML = `<div class="name-row"><h3></h3><span class="spice"></span></div>
-      <p class="from"><svg><use href="#i-pin"/></svg><span></span></p><p class="bio"></p><ul class="chips"></ul>`;
-    body.querySelector("h3").textContent = card.name;
+      <p class="origin"></p><p class="bio"></p><ul class="chips"></ul>`;
+    body.querySelector("h3").textContent = p1 ? card.twist.name : card.name;
     body.querySelector(".spice").textContent = "🌶️".repeat(card.spice || 1);
     body.querySelector(".spice").setAttribute("aria-label", `${T.profileLabels.spice}: ${card.spice || 1} of 3`);
-    body.querySelector(".from span").textContent = card.from;
-    body.querySelector(".bio").textContent = card.bio;
+    const origin = body.querySelector(".origin");
+    if (p1) {
+      // Small round photo of the original dish + "Twist on Masala Dosa"
+      origin.append(photoEl(card.photos[0], "origin-photo"));
+      const t = document.createElement("span");
+      t.textContent = fill(R.twistOf, { name: card.name });
+      origin.append(t);
+    } else {
+      origin.innerHTML = `<svg><use href="#i-pin"/></svg><span></span>`;
+      origin.lastChild.textContent = fill(R.madeDesi, { from: card.from, name: card.name });
+    }
+    body.querySelector(".bio").textContent = p1 ? card.twist.line : card.bio;
     const chips = body.querySelector(".chips");
-    card.chips.forEach((c) => {
+    (card.chips || []).forEach((c) => {
       const li = document.createElement("li");
       li.textContent = c;
       chips.append(li);
@@ -544,34 +529,15 @@
     return el;
   }
 
-  function setCaption(scope, p) {
-    const cap = scope.querySelector(".caption-pill");
-    if (!cap) return;
-    cap.firstChild.textContent = p.caption;
-    cap.lastChild.textContent = p.line ? ` ${p.line}` : "";
-  }
-
-  function flipPhoto(el, dir) {
-    const card = cardById(el.dataset.id);
-    if (!card || card.photos.length < 2) return;
-    const n = card.photos.length;
-    const i = (Number(el.dataset.photo) + dir + n) % n;
-    el.dataset.photo = String(i);
-    el.querySelectorAll(".card-photos .photo").forEach((p, j) => (p.hidden = j !== i));
-    el.querySelectorAll(".bars span").forEach((b, j) => b.classList.toggle("on", j === i));
-    setCaption(el, card.photos[i]);
-    el.classList.add("seen-photos");
-  }
-
   // ---------------------------------------------- full profile
 
   function openProfile(card) {
     if (busy) return;
     const L = T.profileLabels;
+    const p1 = card.part === 1;
     const strip = $("#pPhotos");
     strip.innerHTML = "";
-    // Part 1 shows only the original dish, never the twist, before the answer.
-    card.photos.forEach((p) => {
+    (p1 ? [card.twist.photo, card.photos[0]] : card.photos).forEach((p) => {
       const ph = photoEl(p, "sheet-photo");
       const cap = document.createElement("span");
       cap.className = "sheet-cap";
@@ -579,15 +545,15 @@
       ph.append(cap);
       strip.append(ph);
     });
-    $("#pName").textContent = card.name;
-    $("#pFrom").textContent = card.from;
-    $("#pBio").textContent = card.bio;
+    $("#pName").textContent = p1 ? card.twist.name : card.name;
+    $("#pFrom").textContent = p1 ? fill(T.rounds[1].twistOf, { name: card.name }) : fill(T.rounds[2].madeDesi, { from: card.from, name: card.name });
+    $("#pBio").textContent = p1 ? card.twist.line : card.bio;
     const dl = $("#pFacts");
     dl.innerHTML = "";
     const rows = [
       [L.spice, "🌶️".repeat(card.spice || 1)],
       [L.lookingFor, card.lookingFor],
-      [card.part === 1 ? L.madeOf : L.famousFor, card.part === 1 ? card.madeOf : card.famousFor],
+      [p1 ? L.madeOf : L.famousFor, p1 ? card.madeOf : card.famousFor],
       [L.greenFlag, card.greenFlag, "green"],
       [L.redFlag, card.redFlag, "red"],
       [L.funFact, card.funFact],
@@ -614,7 +580,7 @@
   }
 
   function attachDrag(el) {
-    let sx = 0, sy = 0, dx = 0, dy = 0, t0 = 0, pid = null;
+    let sx = 0, sy = 0, dx = 0, dy = 0, pid = null;
 
     el.addEventListener("pointerdown", (e) => {
       if (busy || S.phase !== "play" || (e.pointerType === "mouse" && e.button !== 0)) return;
@@ -623,12 +589,12 @@
       sx = e.clientX;
       sy = e.clientY;
       dx = dy = 0;
-      t0 = performance.now();
       el.classList.add("is-dragging");
     });
 
     el.addEventListener("pointermove", (e) => {
       if (e.pointerId !== pid) return;
+      if (!S || S.phase !== "play") return;
       dx = e.clientX - sx;
       dy = e.clientY - sy;
       el.style.transform = `translate(${dx}px, ${dy * 0.25}px) rotate(${dx * 0.05}deg)`;
@@ -640,11 +606,9 @@
       pid = null;
       el.classList.remove("is-dragging");
       const moved = Math.hypot(dx, dy);
-      if (moved < 8 && performance.now() - t0 < 500 && e.type === "pointerup") {
+      if (moved < 8) {
         el.style.transform = "";
-        // Pointer capture sends every event to the card, so check where the tap landed.
-        const r = el.querySelector(".card-photos").getBoundingClientRect();
-        if (e.clientY >= r.top && e.clientY <= r.bottom) flipPhoto(el, e.clientX - r.left > r.width / 2 ? 1 : -1);
+        setStamps(el, 0);
         return;
       }
       const th = Math.min(120, el.offsetWidth * 0.28);
@@ -661,7 +625,7 @@
     el.addEventListener("pointercancel", end);
   }
 
-  // The card flies off and the animation plays out fully before the result.
+  // The card flies off; the next card is already underneath.
   async function flyOut(el, dir) {
     if (!el) return;
     const w = el.offsetWidth;
@@ -671,7 +635,7 @@
       el.style.setProperty("--no", dir === "left" ? 1 : 0);
       el.style.setProperty("--crush", dir === "up" ? 1 : 0);
       el.classList.add(`is-tilt-${dir}`);
-      await wait(260);
+      await wait(150);
     }
     if (reduceMotion) return;
     const x = dir === "right" ? window.innerWidth + w : dir === "left" ? -window.innerWidth - w : 0;
@@ -679,7 +643,7 @@
     const rot = dir === "right" ? 26 : dir === "left" ? -26 : 0;
     el.classList.add("is-leaving");
     el.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)${dir === "up" ? " scale(0.9)" : ""}`;
-    await wait(620);
+    await wait(dir === "up" ? 420 : 340);
   }
 
   // ---------------------------------------------- answering
@@ -699,17 +663,21 @@
         enqueue("answer", { token: S.token, attempt: S.attempt, card: opts.moveFrom, answer: "Yes" });
       }
       S.crush = card.id;
+      S.phase = "result"; // the Desi Crush screen waits for Next
     }
-    S.phase = "result";
     save();
     enqueue("answer", { token: S.token, attempt: S.attempt, card: card.id, answer });
     if (navigator.vibrate) navigator.vibrate(answer === "No" ? 15 : answer === CRUSH ? [30, 40, 60] : [20, 40, 30]);
+    if (answer === "Yes") burst($("#deckBurst"), "yes", true);
     const game = S;
     await flyOut($("#deck .is-top"), dir);
     busy = false;
     if (S !== game) return; // reset meanwhile (for example by a team restart)
-    renderProgress();
-    showResult(card, answer);
+    if (answer === CRUSH) {
+      renderProgress();
+      return showResult(card);
+    }
+    advance();
   }
 
   function crushTap() {
@@ -734,92 +702,43 @@
     return photoEl(photo, `plate ${cls}`);
   }
 
-  function showResult(card, answer) {
-    const kind = answer === CRUSH ? "crush" : answer === "Yes" ? "yes" : "no";
+  // The Desi Crush screen: the two desi dishes crash together. Waits for Next.
+  function showResult(card) {
     const R = T.results;
     const ov = $("#result");
-    ov.dataset.answer = kind;
+    ov.dataset.answer = "crush";
     ov.dataset.part = card.part;
     const plates = $("#plates");
     plates.innerHTML = "";
-    const teasers = $("#teasers");
-    teasers.innerHTML = "";
-    let title, name, line;
-
-    if (card.part === 1) {
-      if (kind === "yes") {
-        title = R.match;
-        plates.append(plate(card.photos[0], "plate-left"), plate(card.twist.photo, "plate-right"));
-        name = card.twist.name;
-        line = card.twist.line;
-      } else {
-        title = R.classic;
-        plates.append(plate(card.photos[0], "plate-solo"));
-        name = card.name;
-        line = card.classicLine;
-      }
-    } else {
-      plates.append(plate(card.photos[0], "plate-left"), plate(card.photos[1] || card.photos[0], "plate-right"));
-      if (kind !== "no") {
-        title = kind === "crush" ? R.crush : R.match;
-        name = fill(R.desiName, { name: card.name });
-        line = R.teaserIntro;
-        card.teasers.forEach((t) => {
-          const li = document.createElement("li");
-          li.textContent = t;
-          teasers.append(li);
-        });
-      } else {
-        title = R.authentic;
-        name = card.name;
-        line = card.authenticLine;
-      }
-    }
-    $("#resultTitle").textContent = title;
-    $("#resultName").textContent = name;
-    $("#resultLine").textContent = line;
-    const last = S.index === CARDS.length - 1;
+    plates.append(plate(card.photos[0], "plate-left"), plate(card.photos[1] || card.photos[0], "plate-right"));
+    $("#resultTitle").textContent = R.crush;
+    $("#resultName").textContent = fill(R.crushName, { name: card.name });
+    $("#resultLine").textContent = R.crushLine;
     const nextBtn = $("#nextBtn");
-    nextBtn.textContent = last ? R.last : R.next;
-    // Only the Desi Crush screen waits for a tap. Yes and No move on by themselves.
-    const auto = kind !== "crush";
-    nextBtn.hidden = auto;
-    $("#tapHint").hidden = !auto;
-    $("#timer").hidden = !auto;
-
+    nextBtn.textContent = S.index === CARDS.length - 1 ? R.last : R.next;
     ov.hidden = false;
     ov.classList.remove("is-in");
     void ov.offsetWidth;
     ov.classList.add("is-in");
-    burst($("#burst"), kind);
-
-    clearTimeout(resultTimer);
-    if (auto) {
-      const textLen = title.length + name.length + line.length + (kind === "yes" && card.part === 2 ? card.teasers.join(" ").length : 0);
-      const ms = Math.max(3000, Math.min(5200, 2200 + textLen * 22));
-      $("#timer").style.setProperty("--ms", `${ms}ms`);
-      resultTimer = setTimeout(next, ms);
-    } else {
-      nextBtn.focus({ preventScroll: true });
-    }
+    burst($("#burst"), "crush");
+    nextBtn.focus({ preventScroll: true });
   }
 
   function hideResult() {
-    clearTimeout(resultTimer);
     $("#result").hidden = true;
     $("#burst").innerHTML = "";
   }
 
-  function burst(host, kind) {
+  function burst(host, kind, small = false) {
     host.innerHTML = "";
     if (reduceMotion) return;
-    const glyphs = kind === "no" ? ["✨", "⭐", "✨"] : kind === "crush" ? ["🌶️", "💥", "🔥", "💛", "✨"] : ["💚", "❤️", "✨"];
-    const n = kind === "crush" ? 34 : 22;
+    const glyphs = kind === "crush" ? ["🌶️", "💥", "🔥", "💛", "✨"] : ["💚", "❤️", "✨"];
+    const n = kind === "crush" ? 34 : small ? 12 : 22;
     for (let i = 0; i < n; i++) {
       const s = document.createElement("span");
       s.textContent = glyphs[i % glyphs.length];
       const a = (Math.PI * 2 * i) / n + Math.random() * 0.3;
-      const d = (kind === "crush" ? 220 : 160) + Math.random() * 240;
+      const d = small ? 90 + Math.random() * 120 : (kind === "crush" ? 220 : 160) + Math.random() * 240;
       s.style.setProperty("--x", `${Math.cos(a) * d}px`);
       s.style.setProperty("--y", `${Math.sin(a) * d}px`);
       s.style.setProperty("--d", `${(kind === "crush" ? 420 : 0) + Math.random() * 120}ms`);
@@ -827,12 +746,17 @@
     }
   }
 
+  // Next button on the Desi Crush screen.
   function next() {
     if (busy || !S || S.phase !== "result") return;
     hideResult();
+    advance();
+  }
+
+  function advance() {
     S.index++;
     if (S.index >= CARDS.length) return finish();
-    if (S.index === HALFTIME_AT && !S.sawHalftime) return showHalftime();
+    if (T.halftime && T.halftime.show && S.index === HALFTIME_AT && !S.sawHalftime) return showHalftime();
     goToCard();
   }
 
@@ -863,22 +787,6 @@
     const top = $("#deck .is-top");
     if (top && !reduceMotion) top.classList.add("is-back");
     toast(T.messages.undone, 2200);
-  }
-
-  // ------------------------------------------------------------ plot twist
-
-  function showTwist() {
-    S.phase = "twist";
-    save();
-    const P = T.plotTwist;
-    $("#twistTitle").textContent = P.title;
-    $("#twistText").textContent = P.text;
-    $("#twistCrush").textContent = P.crushNote;
-    $("#twistBtn").textContent = P.button;
-    buildFan($("#twistFan"), CARDS.filter((c) => c.part === 2).slice(0, 3));
-    document.body.dataset.part = 2;
-    show("twist");
-    renderProgress();
   }
 
   // ------------------------------------------------------------ halftime
@@ -961,14 +869,13 @@
     tiles.innerHTML = "";
     CARDS.forEach((c) => {
       const a = S.answers[c.id] || "";
-      const yes = isYes(a);
       const li = document.createElement("li");
       li.className = `tile part-${c.part}`;
       li.dataset.answer = a === CRUSH ? "crush" : a.toLowerCase();
-      li.append(photoEl(c.part === 1 && yes ? c.twist.photo : c.photos[0], "tile-photo"));
+      li.append(photoEl(c.part === 1 ? c.twist.photo : c.photos[0], "tile-photo"));
       const t = document.createElement("p");
       t.innerHTML = "<b></b><span></span>";
-      t.firstChild.textContent = c.part === 1 && yes ? c.twist.name : c.name;
+      t.firstChild.textContent = c.part === 1 ? c.twist.name : c.name;
       t.lastChild.textContent = a === CRUSH ? T.buttons.crush : a;
       li.append(t);
       tiles.append(li);
@@ -1101,10 +1008,6 @@
       const v = el.value.replace(/\s+/g, "").toUpperCase();
       if (v !== el.value) el.value = v;
     });
-    $("#howBtn").addEventListener("click", () => {
-      S.sawHow = true;
-      goToCard();
-    });
     $("#yesBtn").addEventListener("click", () => decide("Yes", "right"));
     $("#noBtn").addEventListener("click", () => decide("No", "left"));
     $("#crushBtn").addEventListener("click", crushTap);
@@ -1116,15 +1019,6 @@
     $("#nextBtn").addEventListener("click", (e) => {
       e.stopPropagation();
       next();
-    });
-    // Tap anywhere on a Yes/No result to move on.
-    $("#result").addEventListener("click", () => {
-      if ($("#result").dataset.answer !== "crush") next();
-    });
-    $("#twistBtn").addEventListener("click", () => {
-      S.seenTwist = true;
-      S.lastPart = 2;
-      goToCard();
     });
     $("#cookie").addEventListener("click", crackCookie);
     $("#halfBtn").addEventListener("click", halfBtn);
@@ -1163,7 +1057,7 @@
         return;
       }
       if (S && S.phase === "result" && !$("#result").hidden) {
-        if (e.key === "Enter" || e.key === "ArrowRight" || e.key === " ") {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           next();
         } else if (e.key === "Backspace" || e.key === "Delete") {
@@ -1200,24 +1094,22 @@
 
   function boot() {
     fillStatic();
-    buildFan($("#fan"), [CARDS[0], CARDS[2], CARDS[1]], T.fanStickers);
+    buildFan($("#fan"), [CARDS[0], CARDS.find((c) => c.part === 2), CARDS[1]], T.fanStickers);
     wire();
     renderSync();
 
     if (S && S.token) {
       const p = S.phase;
       if (p === "done") renderDone();
-      else if (p === "how") showHow();
-      else if (p === "twist") showTwist();
       else if (p === "halftime") {
         show("play");
         renderPlay();
         showHalftime();
-      } else if (p === "result" && S.last) {
+      } else if (p === "result" && S.last && S.last.answer === CRUSH) {
         S.index = S.last.index;
         show("play");
         renderPlay();
-        showResult(CARDS[S.last.index], S.last.answer);
+        showResult(CARDS[S.last.index]);
       } else {
         S.index = Math.min(S.index ?? firstUnanswered(), CARDS.length - 1);
         if (S.answers[CARDS[S.index].id]) S.index = firstUnanswered();
