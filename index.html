@@ -14,17 +14,21 @@
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-no" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
     <symbol id="i-yes" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.4 7.6 3.6 4 7.1 4c2 0 3.5 1 4.9 2.8C13.4 5 14.9 4 16.9 4c3.5 0 5.7 3.6 4.4 7.1-1.8 4.8-9.3 9.4-9.3 9.4z" fill="currentColor"/></symbol>
-    <symbol id="i-super" viewBox="0 0 24 24"><path d="M12 2.8l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.7l-5.6 3.1 1.3-6.2L3 9.3l6.3-.7z" fill="currentColor"/></symbol>
+    <symbol id="i-crush" viewBox="0 0 24 24"><path d="M12 21s-7.2-4.4-8.9-9C1.9 8.6 4 5.2 7.3 5.2c1.9 0 3.3.9 4.7 2.6 1.4-1.7 2.8-2.6 4.7-2.6 3.3 0 5.4 3.4 4.2 6.8-1.7 4.6-8.9 9-8.9 9z" fill="currentColor"/><path d="M12 2.2c.9 1.4 2.4 2.1 2.4 3.6a2.4 2.4 0 0 1-4.8 0c0-.7.3-1.2.7-1.7.2.6.6 1 1.1 1 .6 0 .9-.6.6-1.6-.2-.5 0-1 0-1.3z" fill="#fff"/></symbol>
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7H4V2M4.3 7A8.5 8.5 0 1 1 3.5 13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.3 7-12a7 7 0 1 0-14 0c0 5.7 7 12 7 12zm0-9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" fill="currentColor"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 11v6M12 7.2v.1" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
   </svg>
 
   <div class="app">
     <header class="topbar">
-      <p class="brand"><svg class="brand-heart"><use href="#i-yes"/></svg><span data-text="title"></span></p>
+      <button class="brand" id="brand" type="button" aria-label="Game logo">
+        <img class="brand-logo" id="brandLogo" alt="" hidden>
+        <svg class="brand-heart"><use href="#i-yes"/></svg><span data-text="title"></span>
+      </button>
       <ol class="progress" id="progress" aria-label="Progress"></ol>
       <div class="topbar-end">
-        <p class="sync" id="sync" data-state="saved" role="status"><span class="sync-dot"></span><span id="syncText">All saved</span></p>
+        <span class="sync" id="sync" data-state="saved" title="All saved" aria-hidden="true"></span>
         <button class="btn-quiet" id="exitBtn" type="button">Exit</button>
       </div>
     </header>
@@ -33,21 +37,24 @@
       <!-- Start -->
       <section class="screen screen-start" id="screen-start" aria-labelledby="startTitle">
         <div class="start-hero">
+          <img class="start-logo" id="startLogo" alt="" hidden>
           <h1 id="startTitle" data-text="title"></h1>
           <p class="intro" data-text="intro"></p>
-          <div class="fan" id="fan" aria-hidden="true"></div>
+          <div class="fan" id="fan"></div>
         </div>
         <form class="start-form" id="startForm" novalidate>
+          <h2 data-text="startHeading"></h2>
           <label class="field">
-            <span>Token number</span>
+            <span data-text="tokenLabel"></span>
             <input id="token" name="token" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" required>
+            <small data-text="tokenHelp"></small>
           </label>
           <label class="field">
-            <span>Age</span>
+            <span data-text="ageLabel"></span>
             <input id="age" name="age" type="number" inputmode="numeric" min="5" max="99" required>
           </label>
           <fieldset class="field">
-            <legend>Gender</legend>
+            <legend data-text="genderLabel"></legend>
             <div class="chips-choice">
               <label><input type="radio" name="gender" value="Male" required><span>Male</span></label>
               <label><input type="radio" name="gender" value="Female"><span>Female</span></label>
@@ -57,31 +64,44 @@
           </fieldset>
           <p class="form-error" id="formError" role="alert" hidden></p>
           <button class="btn-primary btn-big" id="startBtn" type="submit"><span data-text="startButton"></span></button>
-          <button class="btn-quiet team-link" id="teamOpen" type="button">Team</button>
         </form>
       </section>
 
+      <!-- How it works -->
+      <section class="screen screen-how" id="screen-how" aria-labelledby="howTitle">
+        <div class="how-card">
+          <h2 id="howTitle"></h2>
+          <ol class="how-steps" id="howSteps"></ol>
+          <p class="how-example" id="howExample"></p>
+          <button class="btn-primary btn-big" id="howBtn" type="button"></button>
+        </div>
+      </section>
+
       <!-- Play -->
-      <section class="screen screen-play" id="screen-play" aria-live="polite">
+      <section class="screen screen-play" id="screen-play">
         <div class="prompt">
           <p class="round-tag" id="roundTag"></p>
           <h2 id="question"></h2>
-          <p class="hint" id="roundHint"></p>
+          <ul class="legend">
+            <li class="legend-yes"><svg><use href="#i-yes"/></svg><span id="yesMeans"></span></li>
+            <li class="legend-no"><svg><use href="#i-no"/></svg><span id="noMeans"></span></li>
+            <li class="legend-crush" id="crushLegend"><svg><use href="#i-crush"/></svg><span id="crushMeans"></span></li>
+          </ul>
           <p class="counter" id="counter"></p>
           <ul class="keys" aria-label="Keyboard shortcuts">
             <li><kbd>←</kbd> No</li>
-            <li><kbd>↑</kbd> Super Like</li>
             <li><kbd>→</kbd> Yes</li>
+            <li class="key-crush"><kbd>↑</kbd> Desi Crush</li>
             <li><kbd>⌫</kbd> Undo</li>
           </ul>
         </div>
         <div class="deck-area">
           <div class="deck" id="deck"></div>
           <div class="controls">
-            <button class="ctl ctl-undo" id="undoBtn" type="button" aria-label="Undo last swipe"><svg><use href="#i-undo"/></svg><span>Undo</span></button>
-            <button class="ctl ctl-no" id="noBtn" type="button" aria-label="No"><svg><use href="#i-no"/></svg><span>No</span></button>
-            <button class="ctl ctl-super" id="superBtn" type="button" aria-label="Super Like"><svg><use href="#i-super"/></svg><span>Super Like</span></button>
-            <button class="ctl ctl-yes" id="yesBtn" type="button" aria-label="Yes"><svg><use href="#i-yes"/></svg><span>Yes</span></button>
+            <button class="ctl ctl-undo" id="undoBtn" type="button"><svg><use href="#i-undo"/></svg><span data-btn="undo"></span></button>
+            <button class="ctl ctl-no" id="noBtn" type="button"><svg><use href="#i-no"/></svg><span data-btn="no"></span></button>
+            <button class="ctl ctl-crush" id="crushBtn" type="button"><svg><use href="#i-crush"/></svg><span data-btn="crush"></span><b class="crush-count" id="crushCount">1</b></button>
+            <button class="ctl ctl-yes" id="yesBtn" type="button"><svg><use href="#i-yes"/></svg><span data-btn="yes"></span></button>
           </div>
         </div>
       </section>
@@ -92,6 +112,7 @@
           <div class="fan fan-small" id="twistFan" aria-hidden="true"></div>
           <h2 id="twistTitle"></h2>
           <p id="twistText"></p>
+          <p class="twist-crush"><svg><use href="#i-crush"/></svg><span id="twistCrush"></span></p>
           <button class="btn-primary btn-big" id="twistBtn" type="button"></button>
         </div>
       </section>
@@ -99,19 +120,25 @@
       <!-- Done -->
       <section class="screen screen-done" id="screen-done" aria-labelledby="profileName">
         <div class="profile-card">
-          <p class="profile-kicker">Your food dating profile</p>
+          <p class="profile-kicker" id="doneKicker"></p>
           <h2 id="profileName"></h2>
           <p id="profileLine"></p>
           <dl class="stats" id="stats"></dl>
-          <p class="save-note" id="saveNote"></p>
-          <button class="btn-primary btn-big" id="nextPlayerBtn" type="button">Next player</button>
+          <button class="btn-primary btn-big" id="nextPlayerBtn" type="button"></button>
         </div>
         <ul class="tiles" id="tiles" aria-label="Your answers"></ul>
       </section>
     </main>
   </div>
 
-  <!-- Match / classic result -->
+  <!-- Round switch flash -->
+  <div class="flash" id="flash" hidden aria-live="polite">
+    <p class="flash-emoji" id="flashEmoji"></p>
+    <p class="flash-title" id="flashTitle"></p>
+    <p class="flash-text" id="flashText"></p>
+  </div>
+
+  <!-- Match / classic / desi crush result -->
   <div class="overlay" id="result" hidden>
     <div class="result" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
       <h2 class="result-title" id="resultTitle"></h2>
@@ -120,26 +147,68 @@
       <p class="result-line" id="resultLine"></p>
       <ul class="teasers" id="teasers"></ul>
       <div class="result-actions">
-        <button class="btn-primary btn-big" id="nextBtn" type="button">Next dish</button>
-        <button class="btn-quiet" id="changeBtn" type="button"><svg><use href="#i-undo"/></svg>Change my answer</button>
+        <button class="btn-primary btn-big" id="nextBtn" type="button"></button>
+        <button class="btn-quiet" id="changeBtn" type="button"><svg><use href="#i-undo"/></svg><span id="changeText"></span></button>
       </div>
+      <div class="timer" id="timer" aria-hidden="true"><span></span></div>
+      <p class="tap-hint-result" id="tapHint"></p>
     </div>
     <div class="burst" id="burst" aria-hidden="true"></div>
+  </div>
+
+  <!-- Full dish profile -->
+  <div class="overlay overlay-dim" id="profile" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pName">
+      <div class="sheet-photos" id="pPhotos"></div>
+      <div class="sheet-body">
+        <h2 id="pName"></h2>
+        <p class="from"><svg><use href="#i-pin"/></svg><span id="pFrom"></span></p>
+        <p id="pBio"></p>
+        <dl class="sheet-facts" id="pFacts"></dl>
+        <button class="btn-primary" id="pBack" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Halftime fortune cookie -->
+  <div class="overlay" id="halftime" hidden>
+    <div class="half" role="dialog" aria-modal="true" aria-labelledby="halfTitle">
+      <h2 id="halfTitle"></h2>
+      <p id="halfText"></p>
+      <button class="cookie" id="cookie" type="button" aria-label="Crack the fortune cookie">
+        <span class="cookie-half cookie-l">🥠</span><span class="cookie-half cookie-r">🥠</span>
+      </button>
+      <p class="fortune" id="fortune" hidden></p>
+      <button class="btn-primary btn-big" id="halfBtn" type="button"></button>
+    </div>
+    <div class="burst" id="halfBurst" aria-hidden="true"></div>
+  </div>
+
+  <!-- Move Desi Crush -->
+  <div class="overlay overlay-dim" id="moveDialog" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="moveTitle">
+      <h2 id="moveTitle"></h2>
+      <p id="moveText"></p>
+      <div class="dialog-actions">
+        <button class="btn-quiet" id="moveKeep" type="button"></button>
+        <button class="btn-primary btn-crush" id="moveYes" type="button"></button>
+      </div>
+    </div>
   </div>
 
   <!-- Confirm exit -->
   <div class="overlay overlay-dim" id="exitDialog" hidden>
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
-      <h2 id="exitTitle">Leave this game?</h2>
-      <p>Answers so far are saved. The same token can carry on later from where it stopped.</p>
+      <h2 id="exitTitle"></h2>
+      <p id="exitText"></p>
       <div class="dialog-actions">
-        <button class="btn-quiet" id="exitCancel" type="button">Keep playing</button>
-        <button class="btn-primary" id="exitConfirm" type="button">Leave game</button>
+        <button class="btn-quiet" id="exitCancel" type="button"></button>
+        <button class="btn-primary" id="exitConfirm" type="button"></button>
       </div>
     </div>
   </div>
 
-  <!-- Team panel -->
+  <!-- Team panel: opens when the logo is tapped 5 times -->
   <div class="overlay overlay-dim" id="team" hidden>
     <div class="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="teamTitle">
       <h2 id="teamTitle">Team tools</h2>
@@ -158,7 +227,7 @@
         </div>
       </div>
       <div class="team-device">
-        <p>This device: <span id="tDevice"></span>. <span id="tQueue"></span></p>
+        <p>This device: <span id="tDevice"></span>. Saving: <span id="tQueue"></span></p>
         <div class="dialog-actions">
           <button class="btn-quiet" id="tReload" type="button">Reload page</button>
           <button class="btn-quiet" id="tClose" type="button">Close</button>

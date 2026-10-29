@@ -190,3 +190,12 @@ test("an alphanumeric token like 1E5 stays text in the sheet", () => {
   assert.equal(be.sheet("Players").rows()[0].Token, "1E5");
   assert.equal(startNew(be, "1E5").state, "resume");
 });
+
+test("tokens ignore case, spaces and leading zeros: a1 = A1, 09 = 9", () => {
+  const be = createBackend(CODE);
+  startNew(be, "a1");
+  assert.equal(startNew(be, " A 1 ").state, "resume");
+  startNew(be, "09");
+  assert.equal(startNew(be, "9").state, "resume");
+  assert.deepEqual(be.sheet("Players").rows().map((r) => String(r.Token)), ["A1", "9"]);
+});

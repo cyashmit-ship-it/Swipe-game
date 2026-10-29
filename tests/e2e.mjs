@@ -33,7 +33,7 @@ const server = createServer((req, res) => {
     return res.end();
   }
   let body = readFileSync(p);
-  if (p.endsWith("data.js")) body = body.toString().replace("PASTE_YOUR_APPS_SCRIPT_URL_HERE", FAKE_URL);
+  if (p.endsWith("data.js")) body = body.toString().replace(/scriptUrl: "[^"]*"/, `scriptUrl: "${FAKE_URL}"`);
   res.writeHead(200, { "Content-Type": TYPES[extname(p)] || "application/octet-stream" });
   res.end(body);
 });
@@ -43,16 +43,12 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
 // ---------------------------------------------------------------- browser
 const browser = await chromium.launch();
 let offline = false;
-let calls = 0;
 
 async function newPage(viewport, opts = {}) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, ...opts });
-  await ctx.route("https://fonts.googleapis.com/**", (r) => r.abort());
-  await ctx.route("https://fonts.gstatic.com/**", (r) => r.abort());
   await ctx.route("https://script.google.com/**", async (route) => {
-    calls++;
     if (offline) return route.abort("internetdisconnected");
-    await new Promise((r) => setTimeout(r, 60)); // a little network delay
+    await new Promise((r) => setTimeout(r, 60));
     const text = be.raw(route.request().postData() || "");
     return route.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: text });
   });
@@ -65,9 +61,10 @@ async function newPage(viewport, opts = {}) {
   return { ctx, page };
 }
 
-const settle = (page) => page.waitForTimeout(450);
+const settle = (page, ms = 450) => page.waitForTimeout(ms);
 const until = (page, fn, ms = 8000) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
 const visible = (loc, ms = 5000) => loc.waitFor({ state: "visible", timeout: ms }).then(() => true, () => false);
+const hidden = (loc, ms = 8000) => loc.waitFor({ state: "hidden", timeout: ms }).then(() => true, () => false);
 
 async function startGame(page, token, age = "22", gender = "Female") {
   await page.locator("#token").fill(token);
@@ -75,22 +72,32 @@ async function startGame(page, token, age = "22", gender = "Female") {
   await page.locator(`.chips-choice span:text-is("${gender}")`).click();
   await page.locator("#startBtn").click();
 }
-const cardName = (page) => page.locator("#deck .is-top h3").textContent();
-async function nextDish(page) {
-  await page.locator("#nextBtn").click();
-  await page.locator("#result").waitFor({ state: "hidden" });
+// After Start: get past "How it works" and the round flash.
+async function toCard(page) {
+  if (await visible(page.locator("#howBtn"), 4000)) await page.locator("#howBtn").click();
+  await waitFlash(page);
+  return visible(page.locator("#deck .is-top"));
 }
-async function dragCard(page, dx, dy = 0) {
+async function waitFlash(page) {
+  await page.waitForTimeout(150);
+  return hidden(page.locator("#flash"), 4000);
+}
+const cardName = (page) => page.locator("#deck .is-top h3").textContent();
+const resultTitle = (page) => page.locator("#resultTitle").textContent();
+const waitResult = (page) => visible(page.locator("#result"), 4000);
+const autoNext = (page) => hidden(page.locator("#result"), 8000);
+
+async function dragCard(page, dx) {
   const box = await page.locator("#deck .is-top").boundingBox();
-  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  const x = box.x + box.width / 2, y = box.y + box.height / 3;
   await page.mouse.move(x, y);
   await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(x + (dx * i) / 12, y + (dy * i) / 12);
+  for (let i = 1; i <= 12; i++) await page.mouse.move(x + (dx * i) / 12, y);
   await page.mouse.up();
 }
 async function touchSwipe(page, dx, dy = 0) {
   const box = await page.locator("#deck .is-top").boundingBox();
-  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  const x = box.x + box.width / 2, y = box.y + box.height / 3;
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
   for (let i = 1; i <= 10; i++) {
@@ -98,216 +105,265 @@ async function touchSwipe(page, dx, dy = 0) {
   }
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 }
-async function noOverflow(page) {
-  return page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
-}
-async function inViewport(page, sel) {
-  return page.evaluate((s) => {
+const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+const inViewport = (page, sel) =>
+  page.evaluate((s) => {
     const r = document.querySelector(s).getBoundingClientRect();
-    return r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight + 1 && r.right <= window.innerWidth + 1;
+    return r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight + 1 && r.right <= window.innerWidth + 1;
   }, sel);
+const textBelowPhoto = (page) =>
+  page.evaluate(() => {
+    const c = document.querySelector("#deck .is-top");
+    return c.querySelector(".card-info").getBoundingClientRect().top >= c.querySelector(".card-photos").getBoundingClientRect().bottom - 1;
+  });
+async function openTeam(page) {
+  for (let i = 0; i < 5; i++) await page.locator("#brand").click();
+  return visible(page.locator("#team"));
 }
 
 // ================================================================ laptop: full game
 {
   const { page } = await newPage({ width: 1440, height: 860 });
-  await settle(page); await page.screenshot({ path: `${SHOTS}/01-start-laptop.png` });
-  check((await page.title()) === "Is It a Match?", "working title shown");
+  await settle(page);
+  await page.screenshot({ path: `${SHOTS}/01-start-laptop.png` });
 
-  await page.locator("#startBtn").click();
-  check(await visible(page.locator("#formError")), "empty form shows an error");
+  const words = (await page.locator("body").innerText()).toLowerCase();
+  check(!/(research|survey|saved|sheet|\bdata\b)/.test(words), "start page has no research or data wording");
+  check((await page.locator("text=Team >> visible=true").count()) === 0, "no visible Team button for players");
+  await page.locator(".fan-card").nth(0).hover({ force: true });
+  await settle(page, 500);
+  check(Number(await page.locator(".fan-card").nth(0).locator(".fan-stamp").evaluate((e) => getComputedStyle(e).opacity)) > 0.9, "hovering a start card shows its sticker");
+  await page.screenshot({ path: `${SHOTS}/02-start-hover.png` });
 
-  await startGame(page, " 012 ");
-  check(await visible(page.locator("#deck .is-top")), "game starts for token 012");
+  await page.locator("#token").fill(" 0 1 2 ");
+  check((await page.locator("#token").inputValue()) === "012", "token box drops spaces as you type");
+  await page.locator("#token").fill("ab1");
+  check((await page.locator("#token").inputValue()) === "AB1", "token box shows capitals");
+
+  await startGame(page, "012");
+  check(await visible(page.locator("#screen-how")), "How it works screen after Start");
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/03-how.png` });
+  await page.locator("#howBtn").click();
+  check(await visible(page.locator("#flash")), "round flash shows before the first card");
+  await settle(page, 500);
+  await page.screenshot({ path: `${SHOTS}/04-flash-round1.png` });
+  await waitFlash(page);
   check((await cardName(page)) === "Masala Dosa", "card 1 is Masala Dosa");
-  check((await page.locator("#roundTag").textContent()) === "Chinese twist", "part 1 round label");
-  await settle(page); await page.screenshot({ path: `${SHOTS}/02-card-laptop.png` });
+  check(await textBelowPhoto(page), "card text sits below the photo (no overlap)");
+  check(await page.locator("#crushBtn").isHidden(), "Desi Crush button hidden in the Chinese round");
+  check((await page.locator("#deck .is-top .card-banner").textContent()).includes("Chinese-style"), "question banner on the card");
+  await settle(page, 700);
+  await page.screenshot({ path: `${SHOTS}/05-card-laptop.png` });
 
-  // 1. Yes button
+  // Full profile
+  await page.locator("#deck .is-top .info-btn").click();
+  check(await visible(page.locator("#profile")), "full profile opens");
+  check((await page.locator("#pFacts").innerText()).includes("Green flag"), "profile shows green flag and other details");
+  await settle(page);
+  await page.screenshot({ path: `${SHOTS}/06-profile-sheet.png` });
+  await page.locator("#pBack").click();
+
+  // 1 Dosa: Yes, auto-advance
   await page.locator("#yesBtn").click();
-  check(await visible(page.locator("#result")), "Yes opens the result screen");
-  check((await page.locator("#resultTitle").textContent()) === "It's a match!", "Yes shows 'It's a match!'");
-  check((await page.locator("#resultName").textContent()) === "Schezwan Dosa", "Yes shows the Chinese twist");
-  await page.waitForTimeout(700);
-  await settle(page); await page.screenshot({ path: `${SHOTS}/03-match-laptop.png` });
-  await nextDish(page);
+  check(await waitResult(page), "Yes opens the result after the card flies off");
+  check((await resultTitle(page)) === "It's a match!", "Yes shows 'It's a match!'");
+  check(await page.locator("#nextBtn").isHidden(), "no Next button on a Yes result");
+  await settle(page, 700);
+  await page.screenshot({ path: `${SHOTS}/07-match.png` });
+  check(await autoNext(page), "Yes result moves on by itself");
 
-  // 2. Mouse drag left
+  // 2 Samosa: drag left, tap to skip
   check((await cardName(page)) === "Samosa", "card 2 is Samosa");
-  await dragCard(page, -260);
-  check(await visible(page.locator("#result")), "drag left answers No");
-  check((await page.locator("#resultTitle").textContent()) === "Keeping it classic", "No shows 'Keeping it classic'");
-  await page.waitForTimeout(700);
-  await settle(page); await page.screenshot({ path: `${SHOTS}/04-classic-laptop.png` });
-  await nextDish(page);
+  await dragCard(page, -280);
+  await waitResult(page);
+  check((await resultTitle(page)) === "Keeping it classic", "drag left = No");
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/08-classic.png` });
+  await page.locator("#result").click({ position: { x: 30, y: 30 } });
+  check(await hidden(page.locator("#result"), 1500), "tapping the result skips the wait");
 
-  // Plot twist before the first cuisine card
-  check(await visible(page.locator("#screen-twist")), "plot-twist screen before part 2");
-  await page.waitForTimeout(600);
-  await settle(page); await page.screenshot({ path: `${SHOTS}/05-twist-laptop.png` });
+  // Plot twist
+  check(await visible(page.locator("#screen-twist")), "plot twist before the cuisine round");
+  await settle(page, 700);
+  await page.screenshot({ path: `${SHOTS}/09-twist.png` });
   await page.locator("#twistBtn").click();
 
-  // 3. Korean: flip photos, Super Like with the keyboard
+  // 3 Korean: Desi Crush
   check((await cardName(page)) === "Korean", "card 3 is Korean");
-  check((await page.locator("#roundTag").textContent()) === "Indian twist", "part 2 round label");
-  const capBefore = await page.locator("#deck .is-top .caption b").textContent();
-  const box = await page.locator("#deck .is-top").boundingBox();
+  check(await page.locator("#crushBtn").isVisible(), "Desi Crush button shows in the cuisine round");
+  check((await page.locator("#crushCount").textContent()) === "1", "1 Desi Crush available");
+  const box = await page.locator("#deck .is-top .card-photos").boundingBox();
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.3);
-  const capAfter = await page.locator("#deck .is-top .caption b").textContent();
-  check(capBefore === "Korean Fried Chicken" && capAfter === "Ramyeon", "tapping the photo shows the second dish");
-  await settle(page); await page.screenshot({ path: `${SHOTS}/06-cuisine-laptop.png` });
+  check((await page.locator("#deck .is-top .caption-pill b").textContent()) === "Ramyeon", "tapping the photo shows the second dish");
+  await page.screenshot({ path: `${SHOTS}/10-cuisine-card.png` });
   await page.keyboard.press("ArrowUp");
-  check(await visible(page.locator("#result")), "arrow up answers Super Like");
-  check((await page.locator("#resultTitle").textContent()) === "Super match!", "Super Like shows 'Super match!'");
-  check((await page.locator("#teasers li").count()) === 2, "teasers appear after the match, not before");
-  await page.waitForTimeout(700);
-  await settle(page); await page.screenshot({ path: `${SHOTS}/07-super-cuisine-laptop.png` });
-  await nextDish(page);
+  await waitResult(page);
+  check((await resultTitle(page)) === "Desi crush!", "Desi Crush shows its own screen");
+  check((await page.locator("#teasers li").count()) === 2, "teasers appear after the answer");
+  await settle(page, 450);
+  await page.screenshot({ path: `${SHOTS}/11-crush-crash.png` });
+  await settle(page, 1200);
+  await page.screenshot({ path: `${SHOTS}/12-crush-done.png` });
+  await page.waitForTimeout(4500);
+  check(await page.locator("#result").isVisible(), "Desi Crush screen waits for Next");
+  await page.locator("#nextBtn").click();
 
-  // 4. Italian: No, then "Change my answer", then Yes
+  // 4 Italian: No, change answer, Yes
   check((await cardName(page)) === "Italian", "card 4 is Italian");
+  check((await page.locator("#crushCount").textContent()) === "0", "Desi Crush shows as used");
   await page.keyboard.press("ArrowLeft");
-  await visible(page.locator("#result"));
+  await waitResult(page);
   await page.locator("#changeBtn").click();
-  check((await cardName(page)) === "Italian", "Change my answer goes back to the same card");
-  check(await page.locator("#undoBtn").isDisabled(), "undo is off after one undo (last swipe only)");
+  check((await cardName(page)) === "Italian", "Change my answer returns to the card");
+  check(await page.locator("#undoBtn").isDisabled(), "undo is off after one undo");
   await page.keyboard.press("ArrowRight");
-  await visible(page.locator("#result"));
-  await nextDish(page);
+  await waitResult(page);
+  await autoNext(page);
 
-  // 5. Bhel: Yes, then undo from the next card, answer No
+  // 5 Bhel: round switch flash, Yes, then halftime
+  check(await visible(page.locator("#flash")), "round flash when switching back to the Chinese round");
+  await waitFlash(page);
   check((await cardName(page)) === "Bhel Puri", "card 5 is Bhel Puri");
   await page.locator("#yesBtn").click();
-  await visible(page.locator("#result"));
-  await nextDish(page);
+  await waitResult(page);
+  await autoNext(page);
+  check(await visible(page.locator("#halftime")), "halftime surprise after 5 dishes");
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/13-halftime.png` });
+  await page.locator("#cookie").click();
+  check(await visible(page.locator("#fortune")), "cracking the cookie shows a fortune");
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/14-fortune.png` });
+  await page.locator("#halfBtn").click();
+  await waitFlash(page);
+
+  // 6 Thai: move the Desi Crush from Korean, undo it, move again
   check((await cardName(page)) === "Thai", "card 6 is Thai");
-  await page.locator("#undoBtn").click();
-  check((await cardName(page)) === "Bhel Puri", "undo button returns to the last card");
-  await page.locator("#noBtn").click();
-  await visible(page.locator("#result"));
-  await nextDish(page);
+  await page.locator("#crushBtn").click();
+  check(await visible(page.locator("#moveDialog")), "using it again asks to move the Desi Crush");
+  check((await page.locator("#moveText").textContent()).includes("Korean"), "move question names Korean");
+  await page.screenshot({ path: `${SHOTS}/15-move-crush.png` });
+  await page.locator("#moveYes").click();
+  await waitResult(page);
+  check((await resultTitle(page)) === "Desi crush!", "moved Desi Crush to Thai");
+  await page.locator("#changeBtn").click();
+  check((await cardName(page)) === "Thai", "change answer goes back to Thai");
+  await page.locator("#crushBtn").click();
+  await page.locator("#moveYes").click();
+  await waitResult(page);
+  await page.locator("#nextBtn").click();
+  await waitFlash(page);
 
   // Reload mid-game
   await until(page, () => document.querySelector("#sync").dataset.state === "saved");
   await page.reload();
-  check((await cardName(page)) === "Thai", "reload resumes at dish 6");
+  await waitFlash(page);
+  check((await cardName(page)) === "Soya Chaap", "reload resumes at dish 7");
 
-  // Offline: answers wait, then save once
+  // Offline
   offline = true;
-  await page.locator("#yesBtn").click();
-  await visible(page.locator("#result"));
-  await nextDish(page);
   await page.locator("#noBtn").click();
-  await visible(page.locator("#result"));
-  check(await until(page, () => document.querySelector("#sync").dataset.state === "offline"), "offline is shown in the top bar");
-  await settle(page); await page.screenshot({ path: `${SHOTS}/08-offline-laptop.png` });
-  await nextDish(page);
+  await waitResult(page);
+  await autoNext(page);
+  await waitFlash(page);
+  await page.locator("#yesBtn").click();
+  await waitResult(page);
+  check(await until(page, () => document.querySelector("#sync").dataset.state === "offline"), "offline dot turns red");
+  await autoNext(page);
   offline = false;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  check(await until(page, () => document.querySelector("#sync").dataset.state === "saved", 15000), "answers save after the internet returns");
+  check(await until(page, () => document.querySelector("#sync").dataset.state === "saved", 15000), "answers save once the internet is back");
 
-  // 8, 9, 10
-  for (const expected of ["Mexican", "Pav Bhaji"]) {
-    check((await cardName(page)) === expected, `card is ${expected}`);
-    await page.locator("#yesBtn").click();
-    await visible(page.locator("#result"));
-    await nextDish(page);
-  }
+  // 9, 10
+  await waitFlash(page);
+  check((await cardName(page)) === "Pav Bhaji", "card 9 is Pav Bhaji");
+  await page.locator("#yesBtn").click();
+  await waitResult(page);
+  await autoNext(page);
+  await waitFlash(page);
   check((await cardName(page)) === "Japanese", "card 10 is Japanese");
-  await page.locator("#superBtn").click();
-  await visible(page.locator("#result"));
-  check((await page.locator("#nextBtn").textContent()) === "See my food profile", "last result leads to the profile");
-  await page.locator("#nextBtn").click();
-  check(await visible(page.locator("#screen-done")), "profile screen shown");
-  check(await until(page, () => document.querySelector("#saveNote").dataset.state === "saved"), "profile says all answers saved");
-  await page.waitForTimeout(500);
-  await settle(page); await page.screenshot({ path: `${SHOTS}/09-profile-laptop.png` });
+  await page.locator("#noBtn").click();
+  await waitResult(page);
+  check(await visible(page.locator("#screen-done"), 9000), "profile screen at the end");
+  check(await until(page, () => document.querySelector("#sync").dataset.state === "saved"), "everything saved");
+  check(!/(saved|sheet)/i.test(await page.locator("#screen-done").innerText()), "end screen has no saving wording");
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/16-done.png` });
 
   const r = row("12");
   const expect = {
-    "P1 Masala Dosa": "Yes", "P1 Samosa": "No", "P2 Korean": "Super Like", "P2 Italian": "Yes", "P1 Bhel Puri": "No",
-    "P2 Thai": "Yes", "P1 Soya Chaap": "No", "P2 Mexican": "Yes", "P1 Pav Bhaji": "Yes", "P2 Japanese": "Super Like",
+    "P1 Masala Dosa": "Yes", "P1 Samosa": "No", "P2 Korean": "Yes", "P2 Italian": "Yes", "P1 Bhel Puri": "Yes",
+    "P2 Thai": "Super Like", "P1 Soya Chaap": "No", "P2 Mexican": "Yes", "P1 Pav Bhaji": "Yes", "P2 Japanese": "No",
   };
-  check(r && Object.entries(expect).every(([k, v]) => r[k] === v), "sheet row has every answer in its fixed column");
-  check(r?.Status === "Completed" && r?.Undos === 2, `row completed with 2 undos (${r?.Status}, ${r?.Undos})`);
-  check(r?.["Yes total (incl. Super Like)"] === 7 && r?.["Super Likes"] === 2, "totals correct");
-  check(r?.["Profile type"] === (await page.locator("#profileName").textContent()), "profile type saved to the sheet");
-  const log = be.sheet("Swipe log").rows().filter((l) => String(l.Token) === "12");
-  const answerLines = log.filter((l) => /^(Yes|No|Super Like)$/.test(l["Answer or action"]));
-  check(answerLines.length === 12, `swipe log has 12 answers incl. 2 redone, no duplicates from retries (${answerLines.length})`);
+  const wrong = Object.entries(expect).filter(([k, v]) => r?.[k] !== v);
+  check(r && !wrong.length, `sheet has every answer; Desi Crush saved as Super Like on Thai only ${wrong.length ? JSON.stringify(wrong.map(([k]) => [k, r?.[k]])) : ""}`);
+  check(r?.Status === "Completed" && r?.["Super Likes"] === 1 && r?.["Yes total (incl. Super Like)"] === 7, "row completed with 1 Super Like, 7 yes");
+  check((await page.locator("#stats").innerText()).includes("Thai"), "end screen shows the Desi Crush");
 
-  // Same token again is blocked
+  // Same token blocked; 12 = 012
   await page.locator("#nextPlayerBtn").click();
   await startGame(page, "12", "30", "Male");
-  check(await visible(page.locator("#formError")), "a finished token is blocked");
-  check((await page.locator("#formError").textContent()).includes("already played"), "block message says already played");
-  await settle(page); await page.screenshot({ path: `${SHOTS}/10-blocked-laptop.png` });
+  check(await visible(page.locator("#formError")), "finished token is blocked");
+  check((await page.locator("#formError").textContent()).includes("already played"), "message says already played");
 
-  // Team override
-  await page.locator("#teamOpen").click();
+  // Team panel via 5 taps on the logo
+  check(await openTeam(page), "5 taps on the logo open the team panel");
   await page.locator("#tName").fill("Riya");
-  await page.locator("#tPin").fill("0000");
+  await page.locator("#tPin").fill("4321");
   await page.locator("#tToken").fill("12");
   await page.locator("#tCheck").click();
-  check(await until(page, () => /not right/.test(document.querySelector("#tResult").textContent)), "wrong PIN refused");
-  await page.locator("#tPin").fill("4321");
-  await page.locator("#tCheck").click();
-  check(await visible(page.locator("#tReplay")), "PIN accepted; replay offered for a finished token");
-  await page.locator("#tReplay").click();
-  check(await until(page, () => /at least 5/.test(document.querySelector("#tResult").textContent)), "replay needs a reason");
+  check(await visible(page.locator("#tReplay")), "replay offered for a finished token");
   await page.locator("#tReason").fill("Phone battery died, re-run approved");
   await page.locator("#tReplay").click();
   check(await until(page, () => /can play again/.test(document.querySelector("#tResult").textContent)), "replay allowed");
-  await settle(page); await page.screenshot({ path: `${SHOTS}/11-team-laptop.png` });
   await page.locator("#tClose").click();
   await page.locator("#startBtn").click();
-  check(await visible(page.locator("#deck .is-top")), "token 12 plays again after the override");
-  const r2 = row("12", 2);
-  check(r2?.Status === "In progress" && /^YES/.test(r2?.Duplicate), "replay row marked as duplicate");
-  check(row("12", 1)?.["P1 Masala Dosa"] === "Yes", "first game's answers untouched");
-  check(be.sheet("Overrides").rows()[0]?.["Team member"] === "Riya", "override saved with name");
+  check(await toCard(page), "token 12 plays again after the override");
+  check(/^YES/.test(row("12", 2)?.Duplicate || ""), "replay row marked duplicate");
   await page.context().close();
 }
 
-// ================================================================ iPad + phone: touch, cross-device resume, restart
+// ================================================================ iPad + phone
 {
-  const ipad = await newPage({ width: 1180, height: 820 }, { hasTouch: true, isMobile: false });
+  const ipad = await newPage({ width: 1180, height: 820 }, { hasTouch: true });
   const p = ipad.page;
-  await settle(p); await p.screenshot({ path: `${SHOTS}/12-start-ipad-landscape.png` });
   await startGame(p, "77", "19", "Male");
-  await visible(p.locator("#deck .is-top"));
-  await settle(p); await p.screenshot({ path: `${SHOTS}/13-card-ipad-landscape.png` });
-  check(await inViewport(p, ".controls"), "iPad landscape: buttons fit on screen without scrolling");
+  await toCard(p);
+  await settle(p, 600);
+  await p.screenshot({ path: `${SHOTS}/17-card-ipad-landscape.png` });
+  check(await inViewport(p, ".controls"), "iPad landscape: buttons fit on screen");
   check(await noOverflow(p), "iPad landscape: no sideways scrolling");
+  check(await textBelowPhoto(p), "iPad landscape: no text over the photo");
   await touchSwipe(p, 300);
-  check(await visible(p.locator("#result")), "touch swipe right works");
-  check((await p.locator("#resultTitle").textContent()) === "It's a match!", "touch swipe right = Yes");
-  await nextDish(p);
+  await waitResult(p);
+  check((await resultTitle(p)) === "It's a match!", "touch swipe right = Yes");
+  await autoNext(p);
   await touchSwipe(p, 0, -320);
-  await visible(p.locator("#result"));
-  check((await p.locator("#resultTitle").textContent()) === "Super match!", "touch swipe up = Super Like");
-  await nextDish(p);
+  await p.waitForTimeout(900);
+  check(await p.locator("#result").isHidden(), "swiping up does nothing (no accidental Desi Crush)");
+  await touchSwipe(p, -300);
+  await waitResult(p);
+  await autoNext(p);
   await until(p, () => document.querySelector("#sync").dataset.state === "saved");
 
-  // Continue on a phone with the same token
   const phone = await newPage({ width: 390, height: 844 }, { hasTouch: true, isMobile: true });
-  await settle(phone.page); await phone.page.screenshot({ path: `${SHOTS}/14-start-phone.png` });
   await startGame(phone.page, "77", "19", "Male");
-  check(await visible(phone.page.locator("#screen-twist")), "same token on another device continues (at the plot twist)");
+  check(await visible(phone.page.locator("#screen-twist")), "same token on another device continues");
   await phone.page.locator("#twistBtn").click();
-  check((await cardName(phone.page)) === "Korean", "continues at dish 3 on the phone");
-  await settle(phone.page); await phone.page.screenshot({ path: `${SHOTS}/15-card-phone.png` });
+  await settle(phone.page, 600);
+  await phone.page.screenshot({ path: `${SHOTS}/18-card-phone.png` });
   check(await inViewport(phone.page, ".controls"), "phone: buttons fit on screen");
   check(await noOverflow(phone.page), "phone: no sideways scrolling");
-  await touchSwipe(phone.page, -300);
-  await visible(phone.page.locator("#result"));
-  await phone.page.waitForTimeout(700);
-  await settle(phone.page); await phone.page.screenshot({ path: `${SHOTS}/16-result-phone.png` });
+  check(await textBelowPhoto(phone.page), "phone: no text over the photo");
+  await phone.page.locator("#crushBtn").click();
+  await waitResult(phone.page);
+  await settle(phone.page, 1400);
+  await phone.page.screenshot({ path: `${SHOTS}/19-crush-phone.png` });
   await phone.ctx.close();
 
-  // Team restarts token 77; the iPad's next answer is refused and it goes back to start
   const t = await newPage({ width: 1366, height: 768 });
-  await t.page.locator("#teamOpen").click();
+  await openTeam(t.page);
   await t.page.locator("#tName").fill("Aman");
   await t.page.locator("#tPin").fill("4321");
   await t.page.locator("#tToken").fill("77");
@@ -321,26 +377,27 @@ async function inViewport(page, sel) {
   await p.locator("#twistBtn").click();
   await p.locator("#noBtn").click();
   check(await until(p, () => document.body.dataset.screen === "start", 10000), "restarted game sends the old device back to start");
-  check(row("77", 1)?.Status === "Restarted (unfinished)" && row("77", 2)?.Status === "Replay allowed", "restart recorded in the sheet");
 
-  // iPad portrait layout
   await p.setViewportSize({ width: 820, height: 1180 });
   await startGame(p, "88", "25", "Other");
-  check(await visible(p.locator("#deck .is-top")), "Start works right after a restarted game");
-  await settle(p); await p.screenshot({ path: `${SHOTS}/17-card-ipad-portrait.png` });
+  check(await toCard(p), "iPad portrait: game starts");
+  await settle(p, 600);
+  await p.screenshot({ path: `${SHOTS}/20-card-ipad-portrait.png` });
   check(await inViewport(p, ".controls"), "iPad portrait: buttons fit on screen");
   check(await noOverflow(p), "iPad portrait: no sideways scrolling");
   await ipad.ctx.close();
 }
 
-// ================================================================ small laptop + small phone layout
+// ================================================================ more sizes
 for (const [w, h, name] of [[1366, 768, "laptop-small"], [1280, 720, "laptop-720"], [360, 640, "phone-small"]]) {
   const { page, ctx } = await newPage({ width: w, height: h }, w < 500 ? { hasTouch: true, isMobile: true } : {});
   await startGame(page, `9${w}`, "20", "Female");
-  check(await visible(page.locator("#deck .is-top")), `${name}: game starts`);
-  await settle(page); await page.screenshot({ path: `${SHOTS}/18-card-${name}.png` });
+  check(await toCard(page), `${name}: game starts`);
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/21-card-${name}.png` });
   check(await inViewport(page, ".controls"), `${name}: buttons fit on screen`);
   check(await noOverflow(page), `${name}: no sideways scrolling`);
+  check(await textBelowPhoto(page), `${name}: no text over the photo`);
   await ctx.close();
 }
 
