@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#24102d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Is It a Match?</title>
+  <link rel="preload" href="fonts/yatra-one.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-screen="start">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-no" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-yes" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.4 7.6 3.6 4 7.1 4c2 0 3.5 1 4.9 2.8C13.4 5 14.9 4 16.9 4c3.5 0 5.7 3.6 4.4 7.1-1.8 4.8-9.3 9.4-9.3 9.4z" fill="currentColor"/></symbol>
+    <symbol id="i-super" viewBox="0 0 24 24"><path d="M12 2.8l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.7l-5.6 3.1 1.3-6.2L3 9.3l6.3-.7z" fill="currentColor"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7H4V2M4.3 7A8.5 8.5 0 1 1 3.5 13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.3 7-12a7 7 0 1 0-14 0c0 5.7 7 12 7 12zm0-9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" fill="currentColor"/></symbol>
+  </svg>
+
+  <div class="app">
+    <header class="topbar">
+      <p class="brand"><svg class="brand-heart"><use href="#i-yes"/></svg><span data-text="title"></span></p>
+      <ol class="progress" id="progress" aria-label="Progress"></ol>
+      <div class="topbar-end">
+        <p class="sync" id="sync" data-state="saved" role="status"><span class="sync-dot"></span><span id="syncText">All saved</span></p>
+        <button class="btn-quiet" id="exitBtn" type="button">Exit</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Start -->
+      <section class="screen screen-start" id="screen-start" aria-labelledby="startTitle">
+        <div class="start-hero">
+          <h1 id="startTitle" data-text="title"></h1>
+          <p class="intro" data-text="intro"></p>
+          <div class="fan" id="fan" aria-hidden="true"></div>
+        </div>
+        <form class="start-form" id="startForm" novalidate>
+          <label class="field">
+            <span>Token number</span>
+            <input id="token" name="token" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" required>
+          </label>
+          <label class="field">
+            <span>Age</span>
+            <input id="age" name="age" type="number" inputmode="numeric" min="5" max="99" required>
+          </label>
+          <fieldset class="field">
+            <legend>Gender</legend>
+            <div class="chips-choice">
+              <label><input type="radio" name="gender" value="Male" required><span>Male</span></label>
+              <label><input type="radio" name="gender" value="Female"><span>Female</span></label>
+              <label><input type="radio" name="gender" value="Other"><span>Other</span></label>
+              <label><input type="radio" name="gender" value="Prefer not to say"><span>Prefer not to say</span></label>
+            </div>
+          </fieldset>
+          <p class="form-error" id="formError" role="alert" hidden></p>
+          <button class="btn-primary btn-big" id="startBtn" type="submit"><span data-text="startButton"></span></button>
+          <button class="btn-quiet team-link" id="teamOpen" type="button">Team</button>
+        </form>
+      </section>
+
+      <!-- Play -->
+      <section class="screen screen-play" id="screen-play" aria-live="polite">
+        <div class="prompt">
+          <p class="round-tag" id="roundTag"></p>
+          <h2 id="question"></h2>
+          <p class="hint" id="roundHint"></p>
+          <p class="counter" id="counter"></p>
+          <ul class="keys" aria-label="Keyboard shortcuts">
+            <li><kbd>←</kbd> No</li>
+            <li><kbd>↑</kbd> Super Like</li>
+            <li><kbd>→</kbd> Yes</li>
+            <li><kbd>⌫</kbd> Undo</li>
+          </ul>
+        </div>
+        <div class="deck-area">
+          <div class="deck" id="deck"></div>
+          <div class="controls">
+            <button class="ctl ctl-undo" id="undoBtn" type="button" aria-label="Undo last swipe"><svg><use href="#i-undo"/></svg><span>Undo</span></button>
+            <button class="ctl ctl-no" id="noBtn" type="button" aria-label="No"><svg><use href="#i-no"/></svg><span>No</span></button>
+            <button class="ctl ctl-super" id="superBtn" type="button" aria-label="Super Like"><svg><use href="#i-super"/></svg><span>Super Like</span></button>
+            <button class="ctl ctl-yes" id="yesBtn" type="button" aria-label="Yes"><svg><use href="#i-yes"/></svg><span>Yes</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Plot twist -->
+      <section class="screen screen-twist" id="screen-twist" aria-labelledby="twistTitle">
+        <div class="twist-inner">
+          <div class="fan fan-small" id="twistFan" aria-hidden="true"></div>
+          <h2 id="twistTitle"></h2>
+          <p id="twistText"></p>
+          <button class="btn-primary btn-big" id="twistBtn" type="button"></button>
+        </div>
+      </section>
+
+      <!-- Done -->
+      <section class="screen screen-done" id="screen-done" aria-labelledby="profileName">
+        <div class="profile-card">
+          <p class="profile-kicker">Your food dating profile</p>
+          <h2 id="profileName"></h2>
+          <p id="profileLine"></p>
+          <dl class="stats" id="stats"></dl>
+          <p class="save-note" id="saveNote"></p>
+          <button class="btn-primary btn-big" id="nextPlayerBtn" type="button">Next player</button>
+        </div>
+        <ul class="tiles" id="tiles" aria-label="Your answers"></ul>
+      </section>
+    </main>
+  </div>
+
+  <!-- Match / classic result -->
+  <div class="overlay" id="result" hidden>
+    <div class="result" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <h2 class="result-title" id="resultTitle"></h2>
+      <div class="plates" id="plates"></div>
+      <p class="result-name" id="resultName"></p>
+      <p class="result-line" id="resultLine"></p>
+      <ul class="teasers" id="teasers"></ul>
+      <div class="result-actions">
+        <button class="btn-primary btn-big" id="nextBtn" type="button">Next dish</button>
+        <button class="btn-quiet" id="changeBtn" type="button"><svg><use href="#i-undo"/></svg>Change my answer</button>
+      </div>
+    </div>
+    <div class="burst" id="burst" aria-hidden="true"></div>
+  </div>
+
+  <!-- Confirm exit -->
+  <div class="overlay overlay-dim" id="exitDialog" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
+      <h2 id="exitTitle">Leave this game?</h2>
+      <p>Answers so far are saved. The same token can carry on later from where it stopped.</p>
+      <div class="dialog-actions">
+        <button class="btn-quiet" id="exitCancel" type="button">Keep playing</button>
+        <button class="btn-primary" id="exitConfirm" type="button">Leave game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team panel -->
+  <div class="overlay overlay-dim" id="team" hidden>
+    <div class="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="teamTitle">
+      <h2 id="teamTitle">Team tools</h2>
+      <form id="teamForm" class="team-grid" novalidate>
+        <label class="field"><span>Your name</span><input id="tName" autocomplete="off" maxlength="40"></label>
+        <label class="field"><span>Stall PIN</span><input id="tPin" type="password" autocomplete="off" maxlength="40"></label>
+        <label class="field"><span>Token</span><input id="tToken" autocomplete="off" autocapitalize="characters" maxlength="20"></label>
+        <button class="btn-primary" id="tCheck" type="submit">Check token</button>
+      </form>
+      <div id="tResult" class="team-result" role="status"></div>
+      <div id="tActions" class="team-actions" hidden>
+        <label class="field"><span>Reason (saved in the sheet)</span><input id="tReason" maxlength="200" placeholder="For example: phone battery died mid-game"></label>
+        <div class="dialog-actions">
+          <button class="btn-primary" id="tReplay" type="button" hidden>Allow a replay</button>
+          <button class="btn-primary" id="tRestart" type="button" hidden>Restart unfinished game</button>
+        </div>
+      </div>
+      <div class="team-device">
+        <p>This device: <span id="tDevice"></span>. <span id="tQueue"></span></p>
+        <div class="dialog-actions">
+          <button class="btn-quiet" id="tReload" type="button">Reload page</button>
+          <button class="btn-quiet" id="tClose" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="toast" id="toast" role="status" hidden></p>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
