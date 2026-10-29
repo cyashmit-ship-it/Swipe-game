@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chindian or Not?</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Screen 1: Welcome -->
+        <div id="screen-welcome" class="screen active">
+            <h1>Chindian or not?</h1>
+            <p>Welcome to the ultimate taste test.</p>
+            <form id="welcome-form">
+                <div class="input-group">
+                    <label>Age</label>
+                    <input type="number" id="user-age" required min="10" max="99">
+                </div>
+                <div class="input-group">
+                    <label>Gender</label>
+                    <select id="user-gender" required>
+                        <option value="" disabled selected>Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Token Number</label>
+                    <input type="text" id="user-token" required>
+                </div>
+                <button type="submit" class="primary-btn">Start</button>
+            </form>
+        </div>
+
+        <!-- Screen 2: The Question -->
+        <div id="screen-question" class="screen">
+            <h2 id="dish-title">Dish Title</h2>
+            <div class="image-container">
+                <img id="dish-image" src="" alt="Dish">
+            </div>
+            <div class="button-group">
+                <button id="btn-transform" class="primary-btn">Make it Chinese</button>
+                <button id="btn-let-it-be" class="secondary-btn">Let it be</button>
+            </div>
+        </div>
+
+        <!-- Screen 3: The Result -->
+        <div id="screen-result" class="screen">
+            <div class="image-container">
+                <img id="result-image" src="" alt="Result Dish">
+            </div>
+            <p id="result-text" class="result-description">Result text goes here.</p>
+            <button id="btn-next" class="primary-btn">Next</button>
+        </div>
+
+        <!-- Screen 4: Completion -->
+        <div id="screen-end" class="screen">
+            <h2>Thank You!</h2>
+            <p id="end-message">Saving your responses...</p>
+            <div class="spinner" id="loading-spinner"></div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
