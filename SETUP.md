@@ -27,7 +27,7 @@ The game is a website on GitHub Pages. Every swipe goes to the Google Sheet **Sw
 
 ## 1b. Updating the Apps Script to a new version of Code.gs
 
-Do this whenever Code.gs in this repo changes (29 Oct: column reorder; later on 29 Oct: numbers-only tokens and one device per token).
+Do this whenever Code.gs in this repo changes (29 Oct: column reorder; later on 29 Oct: numbers-only tokens and one device per token; 30 Oct: deleted rows free a token, Game admin menu).
 
 1. Open `apps-script/Code.gs` in this repo on GitHub. Click the **copy icon** (two squares, top right of the code). The whole file is copied.
 2. Open the sheet **Swipe Game Responses** → **Extensions → Apps Script**.
@@ -38,6 +38,10 @@ Do this whenever Code.gs in this repo changes (29 Oct: column reorder; later on 
 7. In the bar at the top, pick **setup** in the function list, then click **Run**. The log at the bottom says "Setup done". If the columns changed, it also says the old Players tab was renamed. Nothing is deleted.
 8. Check the sheet: a new **Players** tab with the new column order. The old one is now **Players (old layout)**.
 
+Step 7 is only needed when the columns change. The 30 Oct update didn't change any columns, so steps 1–6 are enough.
+
+After the 30 Oct update, reload the sheet tab. A **Game admin** menu appears at the top, after **Help** (it takes a few seconds). The first time you use it, Google asks for permission: **Continue → choose your account → Advanced → Go to (project name) → Allow**.
+
 Do step 6 before step 7. Between them the game saves nothing to the sheet (answers wait on the device and the start screen says to run setup), so nothing can land in the wrong column. After step 7 the waiting answers send themselves.
 
 ## 2. Turn on the website
@@ -47,7 +51,7 @@ After 1–2 minutes the link appears at the top of that page: `https://cyashmit-
 
 ## 3. Add photos
 
-See `images/README.md` for the 20 file names. Upload them into the `images` folder on GitHub (**Add file → Upload files**).
+All 25 photos are in. `images/README.md` lists the file names. To swap one, upload a new file with the same name into the `images` folder on GitHub (**Add file → Upload files**), or send it to Claude.
 
 ## Changing the text
 
@@ -71,7 +75,8 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 
 | In data.js | On screen |
 |---|---|
-| `title`, `intro`, `startHeading`, `startButton` | Start screen |
+| `presenter`, `presents` | The "URBAN ILLUMINA presents" line above the title (`""` hides it) |
+| `title`, `intro`, `startHeading`, `startButton` | Start screen (on phones the intro is hidden to save space) |
 | `howTo` | The 3 "how it works" lines on the start screen |
 | `fanStickers` | Stickers on the 3 cards of the start screen |
 | `rounds` → `1` / `2` | Round title flash, the question, the card banner, the yes/no meanings. `flashSeconds` = how long the round title stays up |
@@ -104,7 +109,20 @@ For analysis, use rows with **Status = Completed**. Decide whether to keep or dr
 
 **Swipe log**: every answer, undo, start and finish, with the time. "Card #" is the dish's position in the game (1–10).
 
-**Overrides**: every replay and restart, with the team member's name and reason.
+**Overrides**: every replay and restart, with the team member's name and reason. Replays done from the sheet menu say "Allowed a replay (sheet menu)".
+
+### Freeing a token by deleting its rows
+
+To make a token usable again as if it was never played (for example test games, or a slip given out twice by mistake):
+
+1. In the **Players** tab press **Ctrl + F** and type the token number. Find **every row** with that token.
+2. Right-click the row number on the left → **Delete row**. Do this for each row of that token. (Selecting the row and pressing Delete to clear it also works.)
+3. The token now starts like new, on any device, with attempt 1.
+
+- Delete **all** rows of the token. If a Completed row is left, the token still says "already played".
+- The deleted answers are gone from Players. The Swipe log keeps its old lines (it's only a history).
+- If that token was still being played on some device, that device goes back to the start screen with "This game was reset by the stall team". Its late answers never land in the new player's row.
+- To let the **same player** play once more and keep the first game, use **Allow a replay** instead (below). That keeps both rows, with the replay marked in Duplicate.
 
 ## On fest day
 
@@ -114,7 +132,9 @@ For analysis, use rows with **Status = Completed**. Decide whether to keep or dr
   - Yellow, blinking: saving.
   - Red: no internet. Answers stay on the device and send themselves when the internet is back. Don't clear the browser data while it's red.
 - **Team tools** (allow a replay, restart a token): tap the **game name/logo at the top left 5 times quickly**. A panel opens. Enter your name, the stall PIN and the token, then **Check token**.
-- **Same token twice:** the game says "already played". To allow another go: Team tools → Check token → **Allow a replay** with a reason.
+- **Same token twice:** the game says "already played". To allow another go, either:
+  - **In the sheet:** **Game admin → Allow a replay for a token**. Type the token, your name and a reason. A new row appears in Players, or
+  - **On the game device:** Team tools → Check token → **Allow a replay** with a reason.
 - **Player walked away mid-game:** tap **Exit** (top right). The same token carries on later from where it stopped, **on the same device**.
 - **"Token X is already playing on another device":** that token's game is still open on another laptop, iPad or phone. Finish it there. If that device died or is busy: Team tools → Check token (it shows which device has it) → **Restart unfinished game**. The token then starts from dish 1 on any device.
 - **Don't clear browser history or site data on the game devices** during the fest. The device would look new and be locked out of its own unfinished game (fix: Restart unfinished game).

@@ -14,6 +14,10 @@ const GAME = {
   logo: "",
   background: "",
 
+  // Small wordmark above the title on the start screen. Leave "" to hide.
+  presenter: "Urban Illumina",
+  presents: "presents",
+
   // ---------------------------------------------------------------- start screen
   title: "Is It a Match?", // WORKING TITLE — to be decided
   intro: "Ten dishes are on the app tonight. Swipe right if you'd try them with a twist, left to keep them classic. Takes about a minute.",
@@ -158,7 +162,7 @@ const GAME = {
     offline: "Couldn't connect. Check the internet, then tap Start again.",
     used: "Token {token} has already played. Please check with the stall team.",
     inUse: "Token {token} is already playing on another device. Please check with the stall team.",
-    restarted: "This game was restarted by the stall team. Enter the token again to start fresh.",
+    restarted: "This game was reset by the stall team. Enter the token again to start fresh.",
     exitTitle: "Leave this game?",
     exitText: "You can pick up where you left off with the same token.",
     exitStay: "Keep playing",

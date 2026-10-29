@@ -15,6 +15,10 @@
  * - Tokens are numbers only; 007 and 7 are the same token.
  * - Never deletes rows. Restarts and replays add new rows and are written to
  *   the Overrides tab with the team member's name and reason.
+ * - To free a token completely, delete all of its rows in the Players tab
+ *   (or clear them). The token then starts like new.
+ * - Adds a "Game admin" menu to the sheet (Allow a replay). It appears a few
+ *   seconds after the sheet opens.
  */
 
 // ---------------------------------------------------------------- settings
@@ -150,6 +154,14 @@ function start(b) {
       age: latest.values[P.AGE], gender: latest.values[P.GENDER],
     };
   }
+  if (status === STATUS.CLOSED) {
+    // Only happens when the newer rows of a restarted game were deleted by hand:
+    // the token is free again.
+    const next = latest.attempt + 1;
+    sh.appendRow(newRow(token, next, STATUS.PLAYING, "Restart (attempt " + latest.attempt + " unfinished)", age, gender, now(), device, ""));
+    log(token, next, "", "", "Started", device, b.rid);
+    return { ok: true, state: "new", token: token, attempt: next, answers: {} };
+  }
   if (status === STATUS.ALLOWED) {
     setCell(sh, latest.row, P.STATUS, STATUS.PLAYING);
     setCell(sh, latest.row, P.AGE, age);
@@ -202,6 +214,7 @@ function finish(b) {
   const sh = playersTab();
   const a = attemptsOf(sh, token).filter((x) => x.attempt === attempt)[0];
   if (!a) return { ok: false, code: "no_game", message: "No game found for this token." };
+  if (notOwner(a, b)) return closed();
   if (a.values[P.STATUS] === STATUS.DONE) return { ok: true };
   if (a.values[P.STATUS] !== STATUS.PLAYING) return closed();
 
@@ -242,7 +255,11 @@ function teamCheck(b) {
 function teamReplay(b) {
   const denied = checkPin(b) || checkReason(b);
   if (denied) return denied;
-  const token = normToken(b.token);
+  return replay(normToken(b.token), b, "Allowed a replay");
+}
+
+// Shared by the website team panel and the sheet's Game admin menu.
+function replay(token, b, action) {
   const sh = playersTab();
   const list = attemptsOf(sh, token);
   const latest = list[list.length - 1];
@@ -253,7 +270,7 @@ function teamReplay(b) {
   const next = latest.attempt + 1;
   const note = clip(b.name, 40) + ": " + clip(b.reason, 200);
   sh.appendRow(newRow(token, next, STATUS.ALLOWED, "YES (replay of attempt " + latest.attempt + ")", "", "", "", "", note));
-  override(token, "Allowed a replay", b, latest.attempt, next);
+  override(token, action, b, latest.attempt, next);
   return { ok: true, token: token, attempt: next, message: "Token " + token + " can play again (attempt " + next + ")." };
 }
 
@@ -305,8 +322,17 @@ function game(b) {
   const sh = playersTab();
   const a = attemptsOf(sh, token).filter((x) => x.attempt === attempt)[0];
   if (!a) return { error: { ok: false, code: "no_game", message: "No game found for this token." } };
-  if (a.values[P.STATUS] !== STATUS.PLAYING) return { error: closed() };
+  if (a.values[P.STATUS] !== STATUS.PLAYING || notOwner(a, b)) return { error: closed() };
   return { sh: sh, row: a.row, values: a.values, token: token, attempt: attempt };
+}
+
+// True when the row belongs to a different device. This matters after a row
+// was deleted and the token started again elsewhere: the old device's late
+// answers must not land in the new player's row.
+function notOwner(a, b) {
+  const owner = String(a.values[C.DEVICE] || "");
+  const dev = clip(b.device, 40);
+  return !!(owner && dev && owner !== dev);
 }
 
 function closed() {
@@ -425,6 +451,52 @@ function tab(name, headers, tokenCol) {
 
 function out(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ---------------------------------------------------------------- Game admin menu (in the sheet)
+
+// Google runs this by itself each time the sheet is opened. Only people who
+// can edit the sheet see the menu, so it needs no PIN.
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("Game admin")
+    .addItem("Allow a replay for a token", "menuAllowReplay")
+    .addToUi();
+}
+
+function menuAllowReplay() {
+  const ui = SpreadsheetApp.getUi();
+  const ask = (title, text) => {
+    const r = ui.prompt(title, text, ui.ButtonSet.OK_CANCEL);
+    return r.getSelectedButton() === ui.Button.OK ? clip(r.getResponseText(), 200) : null;
+  };
+  const raw = ask("Allow a replay", "Token number of the player who finished and should play once more:");
+  if (raw === null) return;
+  const token = normToken(raw);
+  if (!token) return ui.alert("Tokens are numbers only, like 7 or 07. Nothing was changed.");
+  const name = ask("Allow a replay for token " + token, "Your name (saved in the Overrides tab):");
+  if (name === null) return;
+  const reason = ask("Allow a replay for token " + token, "Reason (saved in the Overrides tab), for example: wrong age entered");
+  if (reason === null) return;
+  const b = { name: name, reason: reason };
+  const invalid = checkReason(b);
+  if (invalid) return ui.alert(invalid.message + " Nothing was changed.");
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(25000);
+  } catch (err) {
+    return ui.alert("The sheet is busy with players' answers. Try again in a few seconds.");
+  }
+  let res;
+  try {
+    res = replay(token, b, "Allowed a replay (sheet menu)");
+  } catch (err) {
+    res = { message: String(err && err.message) };
+  } finally {
+    lock.releaseLock();
+  }
+  ui.alert(res.ok ? res.message + " A new row was added in Players." : res.message);
 }
 
 // Run this from the editor (select "setup", click Run) to create the tabs and

@@ -259,3 +259,101 @@ test("tokens ignore spaces and leading zeros: 09 = 9 = ' 9 ', 01 = 1", () => {
   assert.equal(startNew(be, "01").state, "resume");
   assert.deepEqual(be.sheet("Players").rows().map((r) => String(r.Token)), ["9", "1"]);
 });
+
+// ---------------------------------------------------------------- deleting rows by hand
+
+const startOn = (be, token, device) => be.call({ action: "start", token, age: 20, gender: "Male", device, rid: rid() });
+const answerOn = (be, token, attempt, card, device, answer = "Yes") =>
+  be.call({ action: "answer", token, attempt, card, answer, device, rid: rid() });
+
+test("deleting a token's row frees it; the old device's late answers never land in the new row", () => {
+  const be = createBackend(CODE);
+  startOn(be, "40", "phone-A");
+  assert.equal(answerOn(be, "40", 1, "dosa", "phone-A").ok, true);
+
+  be.sheet("Players").data.splice(1, 1); // the team deletes token 40's row
+  assert.equal(answerOn(be, "40", 1, "samosa", "phone-A").code, "no_game", "phone A is told the game is gone");
+
+  const s = startOn(be, "40", "phone-B");
+  assert.equal(s.ok, true);
+  assert.equal(s.state, "new", "token 40 starts like new");
+  assert.equal(s.attempt, 1);
+
+  const late = answerOn(be, "40", 1, "bhel", "phone-A", "No");
+  assert.equal(late.code, "closed", "phone A's queued answer is refused");
+  assert.equal(be.call({ action: "finish", token: "40", attempt: 1, device: "phone-A", rid: rid() }).code, "closed");
+  assert.equal(answerOn(be, "40", 1, "bhel", "phone-B").ok, true, "phone B carries on normally");
+  const rows = be.sheet("Players").rows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]["P1 Bhel Puri"], "Yes");
+  assert.equal(rows[0]["P1 Masala Dosa"], "", "nothing from phone A");
+});
+
+test("deleting a finished token's row lets the token play again", () => {
+  const be = createBackend(CODE);
+  startNew(be, "41");
+  playAll(be, "41", 1, ALL_YES);
+  assert.equal(startNew(be, "41").code, "used");
+  be.sheet("Players").data.splice(1, 1);
+  const s = startNew(be, "41");
+  assert.equal(s.state, "new");
+  assert.equal(s.attempt, 1);
+});
+
+test("clearing a row's cells (instead of deleting it) also frees the token", () => {
+  const be = createBackend(CODE);
+  startNew(be, "42");
+  playAll(be, "42", 1, ALL_YES);
+  be.sheet("Players").data[1] = [];
+  assert.equal(startNew(be, "42").state, "new");
+});
+
+test("after a restart, deleting the newer row frees the token too", () => {
+  const be = createBackend(CODE);
+  startNew(be, "43");
+  be.call({ action: "team_restart", pin: "4321", token: "43", name: "Aman", reason: "Phone died mid-game", rid: rid() });
+  be.sheet("Players").data.splice(2, 1); // delete the attempt-2 row, keep the restarted one
+  const s = startNew(be, "43");
+  assert.equal(s.state, "new");
+  assert.equal(s.attempt, 2);
+  assert.match(be.sheet("Players").rows()[1].Duplicate, /^Restart/);
+});
+
+// ---------------------------------------------------------------- sheet menu
+
+test("sheet menu: Game admin appears with Allow a replay", () => {
+  const be = createBackend(CODE);
+  be.onOpen();
+  assert.equal(be.ui.menus[0].name, "Game admin");
+  assert.deepEqual(be.ui.menus[0].items, [["Allow a replay for a token", "menuAllowReplay"]]);
+});
+
+test("sheet menu: allow a replay adds a marked row and logs who did it", () => {
+  const be = createBackend(CODE);
+  startNew(be, "44");
+  playAll(be, "44", 1, ALL_YES);
+
+  be.menuReplay([null]); // Cancel at the first box
+  assert.equal(be.sheet("Players").rows().length, 1, "cancel changes nothing");
+  assert.match(be.menuReplay(["4a"]), /numbers only/);
+  assert.match(be.menuReplay(["44", "Y", "x"]), /Enter your name/);
+
+  const msg = be.menuReplay(["044", "Yashmit", "Wrong age entered"]);
+  assert.match(msg, /Token 44 can play again \(attempt 2\)/);
+  const rows = be.sheet("Players").rows();
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].Status, "Replay allowed");
+  assert.match(rows[1].Duplicate, /^YES/);
+  const ov = be.sheet("Overrides").rows()[0];
+  assert.equal(ov.Action, "Allowed a replay (sheet menu)");
+  assert.equal(ov["Team member"], "Yashmit");
+  assert.equal(startNew(be, "44").attempt, 2, "the player can now start again");
+});
+
+test("sheet menu: replay is refused for a token that hasn't finished", () => {
+  const be = createBackend(CODE);
+  assert.match(be.menuReplay(["45", "Yashmit", "Testing the menu"]), /hasn't played yet/);
+  startNew(be, "45");
+  assert.match(be.menuReplay(["45", "Yashmit", "Testing the menu"]), /only be allowed after a finished game/);
+  assert.equal(be.sheet("Players").rows().length, 1);
+});

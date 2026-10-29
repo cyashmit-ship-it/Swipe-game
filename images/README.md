@@ -6,7 +6,7 @@ Until a photo is here, the game shows an emoji placeholder for it.
 Square photos work best (about 1000 x 1000 px), with the dish in the middle. Keep each file under 300 KB so cards load fast on fest Wi-Fi.
 Easiest: send the images to Claude in the chat, with any names. Claude renames, shrinks and uploads them.
 
-25 photos in total.
+25 photos in total. All are in. `italian-desi-2.jpg` is a plain veg pizza standing in for the achari paneer pizza until a real photo is made.
 
 ## Round 1: Chinese twist
 

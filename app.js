@@ -144,7 +144,9 @@
   function onRejected(item, res) {
     const b = item.body;
     console.warn("Not saved:", b, res);
-    if (res.code === "closed" && S && S.token === b.token && S.attempt === b.attempt) {
+    // "closed": restarted by the team or taken over by another device.
+    // "no_game": the team deleted this token's row in the sheet.
+    if ((res.code === "closed" || res.code === "no_game") && S && S.token === b.token && S.attempt === b.attempt) {
       resetToStart();
       toast(T.messages.restarted, 6000);
     }

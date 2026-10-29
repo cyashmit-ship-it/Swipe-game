@@ -9,5 +9,7 @@ A Tinder-style food swipe game for market research at the MDI fest.
 - Tokens are numbers only (07 = 7). A token being played on one device can't be opened on another.
 - The end screen gives a random "perfect match" dish, just for fun (not saved).
 - Every swipe is saved straight to a Google Sheet.
+- Deleting all of a token's rows in the sheet frees that token. The sheet has a Game admin menu (Allow a replay).
+- Look: Urban Illumina night poster (dark maroon with sun rays, bunting, vinyl and disco ball, truck-art corners; cream cards; Rye and Shrikhand fonts).
 
 Edit text, dishes and photo names in `data.js`. Setup steps are in `SETUP.md`.

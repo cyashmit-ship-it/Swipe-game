@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#24102d">
+  <meta name="theme-color" content="#12060a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Is It a Match?</title>
-  <link rel="preload" href="fonts/yatra-one.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/shrikhand.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/rye.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -17,8 +18,26 @@
     <symbol id="i-crush" viewBox="0 0 24 24"><path d="M12 21s-7.2-4.4-8.9-9C1.9 8.6 4 5.2 7.3 5.2c1.9 0 3.3.9 4.7 2.6 1.4-1.7 2.8-2.6 4.7-2.6 3.3 0 5.4 3.4 4.2 6.8-1.7 4.6-8.9 9-8.9 9z" fill="currentColor"/><path d="M12 2.2c.9 1.4 2.4 2.1 2.4 3.6a2.4 2.4 0 0 1-4.8 0c0-.7.3-1.2.7-1.7.2.6.6 1 1.1 1 .6 0 .9-.6.6-1.6-.2-.5 0-1 0-1.3z" fill="#fff"/></symbol>
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7H4V2M4.3 7A8.5 8.5 0 1 1 3.5 13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.3 7-12a7 7 0 1 0-14 0c0 5.7 7 12 7 12zm0-9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" fill="currentColor"/></symbol>
+    <!-- Urban Illumina decorations -->
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 0c.9 7.6 3.8 10.6 12 12-8.2 1.4-11.1 4.4-12 12-.9-7.6-3.8-10.6-12-12C8.2 10.6 11.1 7.6 12 0z" fill="currentColor"/></symbol>
+    <symbol id="i-vinyl" viewBox="0 0 100 100"><circle cx="50" cy="50" r="49" fill="#0d0507" stroke="#f2b632" stroke-width="1.5"/><g fill="none" stroke="#3b2a2e" stroke-width="1"><circle cx="50" cy="50" r="43"/><circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="33"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="23"/></g><path d="M22 26a40 40 0 0 1 22-13" fill="none" stroke="#fbeedd" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="50" r="16" fill="#c62832"/><circle cx="50" cy="50" r="12" fill="none" stroke="#f2b632" stroke-width="1.2" stroke-dasharray="2 3"/><circle cx="50" cy="50" r="2.6" fill="#0d0507"/></symbol>
+    <symbol id="i-disco" viewBox="0 0 100 110"><path d="M50 0v14" stroke="#d8bfae" stroke-width="1.5"/><defs><clipPath id="ballclip"><circle cx="50" cy="60" r="44"/></clipPath><radialGradient id="ballshade" cx="35%" cy="35%" r="70%"><stop offset="0" stop-color="#f4eef0"/><stop offset=".55" stop-color="#9b8f98"/><stop offset="1" stop-color="#3a3036"/></radialGradient></defs><circle cx="50" cy="60" r="44" fill="url(#ballshade)"/><g clip-path="url(#ballclip)" stroke="#2a2026" stroke-width="1.1" fill="none"><path d="M0 27h100M0 38h100M0 49h100M0 60h100M0 71h100M0 82h100M0 93h100"/><path d="M50 14v92M35 15c-8 20-8 70 0 90M65 15c8 20 8 70 0 90M21 22c-14 22-14 54 0 76M79 22c14 22 14 54 0 76"/></g><path d="M30 40h8v8h-8zM58 30h7v7h-7z" fill="#fff"/><path d="M78 30l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#f2b632"/></symbol>
+    <symbol id="i-corner" viewBox="0 0 100 100"><path d="M0 100V2a98 98 0 0 1 98 98z" fill="#c62832"/><path d="M0 100V12a88 88 0 0 1 88 88" fill="none" stroke="#fff8ea" stroke-width="4.5" stroke-dasharray="0.1 9" stroke-linecap="round"/><path d="M0 100V24a76 76 0 0 1 76 76z" fill="#f2b632"/><path d="M0 100V38a62 62 0 0 1 62 62z" fill="#1d6e73"/><path d="M0 100V52a48 48 0 0 1 48 48" fill="none" stroke="#f2b632" stroke-width="3" stroke-dasharray="7 5"/><path d="M0 100V60a40 40 0 0 1 40 40z" fill="#e2416e"/><path d="M0 100V76a24 24 0 0 1 24 24z" fill="#fff8ea"/><circle cx="0" cy="100" r="12" fill="#2b1a14"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 11v6M12 7.2v.1" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
   </svg>
+
+  <!-- Night poster background: sun rays, grain, vinyl, disco ball, sparkles, truck-art corners -->
+  <div class="deco" aria-hidden="true">
+    <svg class="vinyl"><use href="#i-vinyl"/></svg>
+    <svg class="disco"><use href="#i-disco"/></svg>
+    <svg class="spark sp-1"><use href="#i-spark"/></svg>
+    <svg class="spark sp-2"><use href="#i-spark"/></svg>
+    <svg class="spark sp-3"><use href="#i-spark"/></svg>
+    <svg class="spark sp-4"><use href="#i-spark"/></svg>
+    <svg class="spark sp-5"><use href="#i-spark"/></svg>
+    <svg class="corner corner-bl"><use href="#i-corner"/></svg>
+    <svg class="corner corner-br"><use href="#i-corner"/></svg>
+  </div>
 
   <div class="app">
     <header class="topbar">
@@ -38,6 +57,7 @@
       <section class="screen screen-start" id="screen-start" aria-labelledby="startTitle">
         <div class="start-hero">
           <img class="start-logo" id="startLogo" alt="" hidden>
+          <p class="presenter"><span class="presenter-name" data-text="presenter"></span><span class="presenter-sub" data-text="presents"></span></p>
           <h1 id="startTitle" data-text="title"></h1>
           <p class="intro" data-text="intro"></p>
           <ul class="start-how" id="startHow"></ul>
@@ -121,6 +141,9 @@
 
   <!-- Round switch flash -->
   <div class="flash" id="flash" hidden aria-live="polite">
+    <svg class="flash-spark fs-1" aria-hidden="true"><use href="#i-spark"/></svg>
+    <svg class="flash-spark fs-2" aria-hidden="true"><use href="#i-spark"/></svg>
+    <svg class="flash-spark fs-3" aria-hidden="true"><use href="#i-spark"/></svg>
     <p class="flash-emoji" id="flashEmoji"></p>
     <p class="flash-title" id="flashTitle"></p>
     <p class="flash-text" id="flashText"></p>
