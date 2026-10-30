@@ -28,7 +28,7 @@ function playAll(be, token, attempt, answers) {
   });
   return be.call({ action: "finish", token, attempt, profile: "The Fusion Flirt", rid: rid() });
 }
-const ALL_YES = IDS.map((_, i) => (i === 0 ? "Super Like" : i % 3 === 0 ? "No" : "Yes"));
+const ALL_YES = IDS.map((_, i) => (i === 7 ? "Super Like" : i % 3 === 0 ? "No" : "Yes"));
 
 test("creates the three tabs with headers in play order: round 1, then round 2", () => {
   const be = createBackend(CODE);
@@ -80,9 +80,9 @@ test("a full game fills one row and completes it", () => {
   assert.equal(playAll(be, "12", 1, ALL_YES).ok, true);
   const [row] = be.sheet("Players").rows();
   assert.equal(row.Status, "Completed");
-  assert.equal(row["P1 Masala Dosa"], "Super Like");
-  assert.equal(row["P2 Italian"], "No");
-  assert.equal(row["Yes total (incl. Super Like)"], 7);
+  assert.equal(row["P1 Masala Dosa"], "No");
+  assert.equal(row["P2 Thai"], "Super Like");
+  assert.equal(row["Yes total (incl. Super Like)"], 6);
   assert.equal(row["Super Likes"], 1);
   assert.equal(row["Profile type"], "The Fusion Flirt");
   assert.ok(row["Finished (IST)"]);
@@ -196,7 +196,7 @@ test("team: replay after a finished game adds a marked row and keeps the first",
   const rows = be.sheet("Players").rows();
   assert.equal(rows.length, 2);
   assert.equal(rows[0].Status, "Completed");
-  assert.equal(rows[0]["P1 Masala Dosa"], "Super Like", "first game untouched");
+  assert.equal(rows[0]["P2 Thai"], "Super Like", "first game untouched");
   assert.equal(rows[1].Status, "In progress");
   assert.match(rows[1].Duplicate, /^YES/);
   assert.match(rows[1].Notes, /Riya: Phone died/);
@@ -258,6 +258,96 @@ test("tokens ignore spaces and leading zeros: 09 = 9 = ' 9 ', 01 = 1", () => {
   startNew(be, "1");
   assert.equal(startNew(be, "01").state, "resume");
   assert.deepEqual(be.sheet("Players").rows().map((r) => String(r.Token)), ["9", "1"]);
+});
+
+// ---------------------------------------------------------------- Desi Crush (picked at the end)
+
+// The five round-2 answers as the client sends them with the "crush" action.
+function crushSend(be, token, attempt, crushId, rest = "Yes") {
+  const answers = {};
+  IDS.slice(5).forEach((id) => (answers[id] = id === crushId ? "Super Like" : rest));
+  return be.call({ action: "crush", token, attempt, answers, device: "iPad-TEST", rid: rid() });
+}
+
+test("the Desi Crush overwrites the cuisine's Yes or No", () => {
+  const be = createBackend(CODE);
+  startNew(be, "70");
+  IDS.forEach((id) => be.call({ action: "answer", token: "70", attempt: 1, card: id, answer: "Yes", rid: rid() }));
+  assert.equal(crushSend(be, "70", 1, "korean").ok, true);
+  const r = be.sheet("Players").rows()[0];
+  assert.equal(r["P2 Korean"], "Super Like");
+  assert.equal(r["P2 Italian"], "Yes", "the other cuisines are untouched");
+  assert.ok(be.sheet("Swipe log").rows().some((x) => x["Answer or action"] === "Desi Crush"), "logged as a Desi Crush");
+});
+
+test("changing the pick puts the old cuisine back to its own answer", () => {
+  const be = createBackend(CODE);
+  startNew(be, "71");
+  // The player said No to Korean while swiping, then picks it as their crush, then changes to Thai.
+  IDS.forEach((id) => be.call({ action: "answer", token: "71", attempt: 1, card: id, answer: id === "korean" ? "No" : "Yes", rid: rid() }));
+  crushSend(be, "71", 1, "korean");
+  const answers = { korean: "No", italian: "Yes", thai: "Super Like", mexican: "Yes", japanese: "Yes" };
+  assert.equal(be.call({ action: "crush", token: "71", attempt: 1, answers, rid: rid() }).ok, true);
+  const r = be.sheet("Players").rows()[0];
+  assert.equal(r["P2 Thai"], "Super Like");
+  assert.equal(r["P2 Korean"], "No", "Korean goes back to the No it was swiped with");
+  assert.equal(be.call({ action: "finish", token: "71", attempt: 1, profile: "The Fusion Flirt", rid: rid() }).ok, true);
+  assert.equal(be.sheet("Players").rows()[0]["Super Likes"], 1, "still exactly one Super Like");
+});
+
+test("a Desi Crush request must name exactly one crush and no unknown answers", () => {
+  const be = createBackend(CODE);
+  startNew(be, "72");
+  IDS.forEach((id) => be.call({ action: "answer", token: "72", attempt: 1, card: id, answer: "Yes", rid: rid() }));
+  const bad = [
+    { korean: "Yes", italian: "Yes", thai: "Yes", mexican: "Yes", japanese: "Yes" },
+    { korean: "Super Like", italian: "Super Like", thai: "Yes", mexican: "Yes", japanese: "Yes" },
+    { korean: "Super Like", italian: "Maybe", thai: "Yes", mexican: "Yes", japanese: "Yes" },
+    { korean: "Super Like", italian: "Yes", thai: "Yes", mexican: "Yes" },
+  ];
+  bad.forEach((answers, i) => {
+    assert.equal(be.call({ action: "crush", token: "72", attempt: 1, answers, rid: rid() }).ok, false, `refused ${i}`);
+  });
+  assert.equal(be.sheet("Players").rows()[0]["P2 Korean"], "Yes", "nothing was written");
+});
+
+// ---------------------------------------------------------------- retyping a token in the sheet
+
+test("retyping a row's token moves that game to the new number and frees the old one", () => {
+  const be = createBackend(CODE);
+  startNew(be, "36");
+  be.call({ action: "answer", token: "36", attempt: 1, card: "dosa", answer: "Yes", device: "iPad-TEST", rid: rid() });
+  const sh = be.sheet("Players");
+  sh.put(2, 1, "1"); // the team types 1 over the 36
+
+  assert.equal(startOn(be, "1", "iPad-TEST").state, "resume", "token 1 now holds that game");
+  assert.deepEqual(startOn(be, "1", "iPad-TEST").answers, { dosa: "Yes" }, "with its answers");
+  assert.equal(be.call({ action: "answer", token: "1", attempt: 1, card: "samosa", answer: "No", device: "iPad-TEST", rid: rid() }).ok, true);
+  assert.equal(sh.rows()[0]["P1 Samosa"], "No", "new answers go to the same row");
+
+  const freed = startOn(be, "36", "phone-X");
+  assert.equal(freed.state, "new", "36 is free again");
+  assert.equal(sh.rows().length, 2);
+});
+
+test("a retyped token is read the same way as a typed one: 01, 1 and ' 1 ' all match", () => {
+  const be = createBackend(CODE);
+  startNew(be, "36");
+  const sh = be.sheet("Players");
+  for (const typed of ["01", " 1 ", "001"]) {
+    sh.put(2, 1, typed);
+    assert.equal(startOn(be, "1", "iPad-TEST").state, "resume", `sheet cell ${JSON.stringify(typed)} is token 1`);
+    assert.equal(sh.rows().length, 1, "no extra row");
+  }
+});
+
+test("retyping a finished game's token blocks the new number and frees the old one", () => {
+  const be = createBackend(CODE);
+  startNew(be, "36");
+  playAll(be, "36", 1, ALL_YES);
+  be.sheet("Players").put(2, 1, "5");
+  assert.equal(startNew(be, "5").code, "used", "token 5 is now the one that has played");
+  assert.equal(startNew(be, "36").state, "new", "36 can be handed out again");
 });
 
 // ---------------------------------------------------------------- deleting rows by hand

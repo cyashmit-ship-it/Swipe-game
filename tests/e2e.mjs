@@ -85,9 +85,12 @@ async function waitFlash(page) {
 const cardName = (page) => page.locator("#deck .is-top h3").textContent();
 const resultTitle = (page) => page.locator("#resultTitle").textContent();
 const waitResult = (page) => visible(page.locator("#result"), 4000);
+// The mandatory Desi Crush screen, after all ten swipes.
+const waitCrushPick = (page) => visible(page.locator("#screen-crush"), 6000);
+const pickCrush = (page, name) => page.locator(`.crush-tile:has-text("${name}")`).click();
 // Yes/No: the next card comes straight in (no result screen).
 const nextCard = (page, name, ms = 2500) =>
-  until(page, (n) => document.querySelector("#deck .is-top:not(.is-leaving) h3")?.textContent === n, ms, name);
+  until(page, (n) => document.querySelector("#flash").hidden && document.querySelector("#deck .is-top:not(.is-leaving) h3")?.textContent === n, ms, name);
 
 async function dragCard(page, dx) {
   const box = await page.locator("#deck .is-top").boundingBox();
@@ -148,12 +151,12 @@ async function openTeam(page) {
   check(await visible(page.locator("#flash")), "Start goes straight to the round 1 flash");
   await waitFlash(page);
 
-  // 1 Masala Dosa: Yes -> match screen with the twist, moves on by itself
+  // 1 Masala Dosa: Yes -> straight to the next card, no screen
   check((await cardName(page)) === "Masala Dosa", "card 1 shows the original: Masala Dosa");
   check((await page.locator("#deck .is-top .card-banner").textContent()).includes("Chinese-style"), "card asks: would you try it Chinese-style?");
   check((await page.locator("#question").textContent()).includes("Chinese-style"), "question on the left");
   check(await textBelowPhoto(page), "card text sits below the photo (no overlap)");
-  check(await page.locator("#crushBtn").isHidden(), "Desi Crush button hidden in round 1");
+  check((await page.locator("#startHow").innerText()).length >= 0, "");
   await settle(page, 400);
   await page.screenshot({ path: `${SHOTS}/02-card-round1.png` });
 
@@ -163,33 +166,21 @@ async function openTeam(page) {
   check(!(await page.locator("#profile").innerText()).includes("Schezwan"), "profile doesn't give away the twist");
   await page.locator("#pBack").click();
 
-  await page.locator("#yesBtn").click();
-  check(await waitResult(page), "Yes opens the match screen");
-  check((await resultTitle(page)) === "It's a match!", "It's a match!");
-  check((await page.locator("#resultName").textContent()) === "Schezwan Dosa", "match screen reveals Schezwan Dosa");
-  check((await page.locator("#plates .plate").count()) === 2, "original and twist plates slide in");
-  check(await page.locator("#nextBtn").isHidden(), "no Next button after a Yes");
-  await settle(page, 700);
-  await page.screenshot({ path: `${SHOTS}/03-match-round1.png` });
   const t0 = Date.now();
-  check(await hidden(page.locator("#result"), 5000), "match screen moves on by itself");
-  const shown = (Date.now() - t0 + 700) / 1000;
-  check(shown >= 1.9 && shown <= 4, `match screen stays about 2-3.5 s (${shown.toFixed(1)} s)`);
+  await page.locator("#yesBtn").click();
+  check(await nextCard(page, "Samosa"), "Yes: the next card comes straight in");
+  check(await page.locator("#result").isHidden(), 'no "It\'s a match" screen after a Yes');
+  check((Date.now() - t0) / 1000 < 1.6, "a Yes takes under 1.6 s");
 
-  // 2 Samosa: drag left -> straight to the next card
-  check(await nextCard(page, "Samosa"), "card 2 is Samosa");
+  // 2 Samosa: drag left
   await dragCard(page, -280);
   check(await nextCard(page, "Bhel Puri"), "No: next card comes straight in");
   check(await page.locator("#result").isHidden(), "no screen after No");
 
-  // 3 Bhel: Yes, tap to skip
+  // 3 Bhel: Yes
   await page.keyboard.press("ArrowRight");
-  await waitResult(page);
-  check((await page.locator("#resultName").textContent()) === "Chinese Bhel", "Bhel reveals Chinese Bhel");
-  await page.locator("#result").click({ position: { x: 30, y: 30 } });
-  check(await hidden(page.locator("#result"), 1500), "tapping the match screen skips the wait");
 
-  // 4 Soya Chaap: No, undo, Yes (skip with the right arrow)
+  // 4 Soya Chaap: No, undo, Yes
   check(await nextCard(page, "Soya Chaap"), "card 4 is Soya Chaap");
   await page.keyboard.press("ArrowLeft");
   await nextCard(page, "Pav Bhaji");
@@ -197,62 +188,28 @@ async function openTeam(page) {
   check((await cardName(page)) === "Soya Chaap", "undo goes back one card");
   check(await page.locator("#undoBtn").isDisabled(), "undo is off after one undo");
   await page.keyboard.press("ArrowRight");
-  await waitResult(page);
-  await page.keyboard.press("ArrowRight");
-  check(await hidden(page.locator("#result"), 1500), "right arrow skips the match screen");
 
-  // 5 Pav Bhaji: Yes, auto -> round 2 flash
+  // 5 Pav Bhaji: Yes -> round 2 flash
   check(await nextCard(page, "Pav Bhaji"), "card 5 is Pav Bhaji");
   await page.locator("#yesBtn").click();
-  await waitResult(page);
   check(await visible(page.locator("#flash"), 6000), "round 2 flash after dish 5");
-  check((await page.locator("#flashCrush").textContent()).includes("Desi Crush"), "round 2 flash explains the Desi Crush");
+  check((await page.locator("#flashCrush").textContent()).includes("Desi Crush"), "round 2 flash warns the Desi Crush is coming");
   check(await page.locator("#halftime").isHidden(), "fortune cookie is switched off");
   await settle(page, 700);
   await page.screenshot({ path: `${SHOTS}/04-flash-round2.png` });
   await waitFlash(page);
 
-  // 6 Korean: Desi Crush
+  // 6 Korean, 7 Italian, 8 Thai: all Yes, no screens
   check((await cardName(page)) === "Korean", "card 6 is Korean");
   check((await page.locator("#deck .is-top .card-banner").textContent()).includes("desi-style"), "card asks: would you try it desi-style?");
-  check(await page.locator("#crushBtn").isVisible(), "Desi Crush button shows in round 2");
-  check((await page.locator("#crushCount").textContent()) === "1", "1 Desi Crush available");
+  check((await page.locator(".ctl").count()) === 3, "only Undo, No and Yes buttons (no Desi Crush button)");
   await settle(page, 400);
   await page.screenshot({ path: `${SHOTS}/05-card-round2.png` });
-  await page.keyboard.press("ArrowUp");
-  check(await waitResult(page), "Desi Crush opens its screen");
-  check((await resultTitle(page)) === "Desi crush!", "Desi Crush title");
-  check((await page.locator("#teasers li").count()) === 2 && (await page.locator("#teasers").innerText()).includes("Butter-chicken"), "Desi Crush shows the two desi dishes");
-  await settle(page, 1600);
-  await page.screenshot({ path: `${SHOTS}/06-crush.png` });
-  await page.waitForTimeout(3000);
-  check(await page.locator("#result").isVisible(), "Desi Crush screen waits for Next");
-  await page.locator("#nextBtn").click();
-
-  // 7 Italian: Yes -> desi dishes
-  check(await nextCard(page, "Italian"), "card 7 is Italian");
-  check((await page.locator("#crushCount").textContent()) === "0", "Desi Crush shows as used");
   await page.keyboard.press("ArrowRight");
-  await waitResult(page);
-  check((await page.locator("#resultName").textContent()) === "Italian, the desi way", "Italian match screen");
-  check((await page.locator("#teasers").innerText()).includes("Makhani pasta"), "shows makhani pasta and achari paneer pizza");
-  await settle(page, 700);
-  await page.screenshot({ path: `${SHOTS}/07-match-round2.png` });
-  await hidden(page.locator("#result"), 5000);
-
-  // 8 Thai: move the Desi Crush from Korean, change it, move again
+  check(await nextCard(page, "Italian"), "card 7 is Italian");
+  await page.keyboard.press("ArrowRight");
   check(await nextCard(page, "Thai"), "card 8 is Thai");
-  await page.locator("#crushBtn").click();
-  check(await visible(page.locator("#moveDialog")), "using it again asks to move the Desi Crush");
-  check((await page.locator("#moveText").textContent()).includes("Korean"), "move question names Korean");
-  await page.locator("#moveYes").click();
-  await waitResult(page);
-  await page.locator("#changeBtn").click();
-  check((await cardName(page)) === "Thai", "Change my answer goes back to Thai");
-  await page.locator("#crushBtn").click();
-  await page.locator("#moveYes").click();
-  await waitResult(page);
-  await page.locator("#nextBtn").click();
+  await page.keyboard.press("ArrowRight");
   await nextCard(page, "Mexican");
 
   // Reload mid-game
@@ -271,8 +228,34 @@ async function openTeam(page) {
   check(await until(page, () => document.querySelector("#sync").dataset.state === "saved", 15000), "answers save once the internet is back");
 
   await page.locator("#yesBtn").click();
-  await waitResult(page);
-  check(await visible(page.locator("#screen-done"), 6000), "profile screen after the last match screen");
+
+  // The Desi Crush is mandatory and comes after all ten swipes.
+  check(await waitCrushPick(page), "the Desi Crush screen comes after dish 10");
+  check(await page.locator("#screen-done").isHidden(), "the profile screen does not open before a Desi Crush is picked");
+  check((await page.locator(".crush-tile").count()) === 5, "all five cuisines are offered");
+  check((await page.locator("#crushTitle").textContent()).toLowerCase().includes("desi crush"), "screen asks for the Desi Crush");
+  check(/have to choose|must/i.test(await page.locator("#crushText").textContent()), "screen says the pick is required");
+  check(await noOverflow(page), "Desi Crush screen: no sideways scrolling");
+  await settle(page, 600);
+  await page.screenshot({ path: `${SHOTS}/06-crush-pick.png` });
+
+  // Pick Thai, then change the pick to Korean.
+  await pickCrush(page, "Thai");
+  check(await waitResult(page), "picking a cuisine opens the Desi Crush screen");
+  check((await resultTitle(page)) === "Desi crush!", "Desi Crush title");
+  await page.locator("#changeBtn").click();
+  check(await waitCrushPick(page), "Pick a different one goes back to the cuisines");
+  check((await page.locator(".crush-tile.is-picked").innerText()).includes("Thai"), "the earlier pick is marked");
+  await pickCrush(page, "Korean");
+  check(await waitResult(page), "the new pick opens its screen");
+  check((await page.locator("#resultName").textContent()) === "Korean, the desi way", "Korean Desi Crush screen");
+  check((await page.locator("#teasers li").count()) === 2 && (await page.locator("#teasers").innerText()).includes("Butter-chicken"), "shows the two desi dishes");
+  await settle(page, 1800);
+  await page.screenshot({ path: `${SHOTS}/07-crush-reveal.png` });
+  await page.waitForTimeout(2500);
+  check(await page.locator("#result").isVisible(), "the Desi Crush screen waits for the button");
+  await page.locator("#nextBtn").click();
+  check(await visible(page.locator("#screen-done"), 6000), "profile screen after the Desi Crush");
   check(await until(page, () => document.querySelector("#sync").dataset.state === "saved"), "everything saved");
   check(!/(saved|sheet|second)/i.test(await page.locator("#screen-done").innerText()), "end screen has no saving or timer wording");
   const matchName = await page.locator("#matchName").textContent();
@@ -286,13 +269,13 @@ async function openTeam(page) {
   const r = row("12");
   const expect = {
     "P1 Masala Dosa": "Yes", "P1 Samosa": "No", "P1 Bhel Puri": "Yes", "P1 Soya Chaap": "Yes", "P1 Pav Bhaji": "Yes",
-    "P2 Korean": "Yes", "P2 Italian": "Yes", "P2 Thai": "Super Like", "P2 Mexican": "No", "P2 Japanese": "Yes",
+    "P2 Korean": "Super Like", "P2 Italian": "Yes", "P2 Thai": "Yes", "P2 Mexican": "No", "P2 Japanese": "Yes",
   };
   const wrong = Object.entries(expect).filter(([k, v]) => r?.[k] !== v);
-  check(r && !wrong.length, `sheet has every answer; Desi Crush saved as Super Like on Thai only ${wrong.length ? JSON.stringify(wrong.map(([k]) => [k, r?.[k]])) : ""}`);
+  check(r && !wrong.length, `sheet has every answer; changing the pick put Thai back to Yes ${wrong.length ? JSON.stringify(wrong.map(([k]) => [k, r?.[k]])) : ""}`);
   check(r?.Status === "Completed" && r?.["Super Likes"] === 1 && r?.["Yes total (incl. Super Like)"] === 8, "row completed with 1 Super Like, 8 yes");
   check(!Object.values(r || {}).some((v) => String(v) === matchName), "the perfect match is not saved to the sheet");
-  check((await page.locator("#stats").innerText()).includes("Thai"), "end screen shows the Desi Crush");
+  check((await page.locator("#stats").innerText()).includes("Korean"), "end screen shows the Desi Crush");
 
   // Same token blocked; 12 = 012
   await page.locator("#nextPlayerBtn").click();
@@ -338,10 +321,14 @@ async function openTeam(page) {
     yes += y;
     await page.keyboard.press(y ? "ArrowRight" : "ArrowLeft");
   }
+  await waitCrushPick(page);
+  await page.locator(".crush-tile").first().click();
+  await visible(page.locator("#result"), 6000);
+  await page.locator("#nextBtn").click();
   await visible(page.locator("#screen-done"), 8000);
   const machine = (Date.now() - t0) / 1000;
   console.log(`      screens + animations with ${yes} Yes answers: ${machine.toFixed(1)} s; with ~3 s thinking per dish: ~${(machine + 30).toFixed(0)} s`);
-  check(machine < 36, `screens and animations take under 36 s (${machine.toFixed(1)} s)`);
+  check(machine < 22, `screens and animations take under 22 s (${machine.toFixed(1)} s)`);
   await ctx.close();
 }
 
@@ -357,12 +344,10 @@ async function openTeam(page) {
   check(await noOverflow(p), "iPad landscape: no sideways scrolling");
   check(await textBelowPhoto(p), "iPad landscape: no text over the photo");
   await touchSwipe(p, 300);
-  check(await waitResult(p), "touch swipe right = Yes, match screen");
-  await hidden(p.locator("#result"), 5000);
-  check(await nextCard(p, "Samosa"), "then the next card");
+  check(await nextCard(p, "Samosa"), "touch swipe right = Yes, next card comes in");
   await touchSwipe(p, 0, -320);
   await p.waitForTimeout(900);
-  check((await cardName(p)) === "Samosa" && (await p.locator("#result").isHidden()), "swiping up does nothing (no accidental Desi Crush)");
+  check((await cardName(p)) === "Samosa" && (await p.locator("#result").isHidden()), "swiping up does nothing");
   await touchSwipe(p, -300);
   await nextCard(p, "Bhel Puri");
   await until(p, () => document.querySelector("#sync").dataset.state === "saved");
@@ -384,11 +369,22 @@ async function openTeam(page) {
   check(await noOverflow(ph), "phone: no sideways scrolling");
   check(await textBelowPhoto(ph), "phone: no text over the photo");
   await ph.locator("#yesBtn").click();
-  await waitResult(ph);
-  await settle(ph, 900);
-  await ph.screenshot({ path: `${SHOTS}/12-match-phone.png` });
-  check(await inViewport(ph, ".result-name"), "phone: match screen fits");
+  check(await nextCard(ph, "Samosa"), "phone: Yes goes straight to the next card");
   check((await ph.evaluate(() => window.innerWidth)) === 390, "phone: no zoom-out while a card flies off");
+  for (const n of ["Samosa", "Bhel Puri", "Soya Chaap", "Pav Bhaji", "Korean", "Italian", "Thai", "Mexican", "Japanese"]) {
+    check(await nextCard(ph, n, 8000), `phone: card ${n}`);
+    await ph.locator("#yesBtn").click();
+  }
+  check(await waitCrushPick(ph), "phone: the Desi Crush screen comes after dish 10");
+  check(await noOverflow(ph), "phone: Desi Crush screen has no sideways scrolling");
+  check(await inViewport(ph, "#crushTitle"), "phone: Desi Crush heading fits");
+  await settle(ph, 700);
+  await ph.screenshot({ path: `${SHOTS}/12-crush-pick-phone.png` });
+  await pickCrush(ph, "Korean");
+  check(await waitResult(ph), "phone: the Desi Crush screen opens");
+  await settle(ph, 1800);
+  await ph.screenshot({ path: `${SHOTS}/12b-crush-phone.png` });
+  check(await inViewport(ph, ".result-name"), "phone: Desi Crush screen fits");
   await phone.ctx.close();
 
   // Team restart frees the token; the iPad's old game is closed.

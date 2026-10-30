@@ -17,6 +17,8 @@
  *   the Overrides tab with the team member's name and reason.
  * - To free a token completely, delete all of its rows in the Players tab
  *   (or clear them). The token then starts like new.
+ * - Changing the Token cell of a row moves that whole game to the new number.
+ *   The old number is free again straight away.
  * - Adds a "Game admin" menu to the sheet (Allow a replay). It appears a few
  *   seconds after the sheet opens.
  */
@@ -45,6 +47,8 @@ const CARDS = [
   ["japanese", "P2 Japanese"],
 ];
 const ANSWERS = ["Yes", "No", "Super Like"];
+// Round of each card, in the same order as CARDS: five dishes, then five cuisines.
+const CARD_PART = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2];
 
 // ---------------------------------------------------------------- layout
 
@@ -109,6 +113,7 @@ function handle(b) {
   switch (b.action) {
     case "start": return start(b);
     case "answer": return answer(b);
+    case "crush": return crush(b);
     case "undo": return undo(b);
     case "finish": return finish(b);
     case "team_check": return teamCheck(b);
@@ -193,6 +198,36 @@ function answer(b) {
   return { ok: true };
 }
 
+// The Desi Crush, picked once at the end of the game. One request rewrites all
+// five round-2 cells, so changing the pick puts the cuisine it came from back
+// to its plain Yes or No. Unlike "answer", this is allowed to overwrite.
+function crush(b) {
+  const g = game(b);
+  if (g.error) return g.error;
+  const given = b.answers || {};
+  const part2 = [];
+  for (let i = 0; i < CARDS.length; i++) if (CARD_PART[i] === 2) part2.push(i);
+
+  let crushes = 0;
+  for (const i of part2) {
+    const v = String(given[CARDS[i][0]] || "");
+    if (!v || ANSWERS.indexOf(v) < 0) return bad("Missing or unknown answer for " + CARDS[i][1] + ".");
+    if (v === "Super Like") crushes++;
+  }
+  if (crushes !== 1) return bad("Exactly one Desi Crush is needed.");
+
+  let moved = "";
+  for (const i of part2) {
+    const want = String(given[CARDS[i][0]]);
+    const had = String(g.values[P.FIRST_CARD + i] || "");
+    if (had === want) continue;
+    setCell(g.sh, g.row, P.FIRST_CARD + i, want);
+    if (want === "Super Like") moved = CARDS[i][1];
+  }
+  if (moved) log(g.token, g.attempt, "", moved, "Desi Crush", clip(b.device, 40), b.rid);
+  return { ok: true };
+}
+
 function undo(b) {
   const g = game(b);
   if (g.error) return g.error;
@@ -212,7 +247,7 @@ function finish(b) {
   const token = normToken(b.token);
   const attempt = Number(b.attempt);
   const sh = playersTab();
-  const a = attemptsOf(sh, token).filter((x) => x.attempt === attempt)[0];
+  const a = lastAttempt(attemptsOf(sh, token), attempt);
   if (!a) return { ok: false, code: "no_game", message: "No game found for this token." };
   if (notOwner(a, b)) return closed();
   if (a.values[P.STATUS] === STATUS.DONE) return { ok: true };
@@ -320,7 +355,7 @@ function game(b) {
   const attempt = Number(b.attempt);
   if (!token || !attempt) return { error: bad("Missing token or attempt.") };
   const sh = playersTab();
-  const a = attemptsOf(sh, token).filter((x) => x.attempt === attempt)[0];
+  const a = lastAttempt(attemptsOf(sh, token), attempt);
   if (!a) return { error: { ok: false, code: "no_game", message: "No game found for this token." } };
   if (a.values[P.STATUS] !== STATUS.PLAYING || notOwner(a, b)) return { error: closed() };
   return { sh: sh, row: a.row, values: a.values, token: token, attempt: attempt };
@@ -333,6 +368,13 @@ function notOwner(a, b) {
   const owner = String(a.values[C.DEVICE] || "");
   const dev = clip(b.device, 40);
   return !!(owner && dev && owner !== dev);
+}
+
+// The newest row for this attempt. Two rows can share an attempt number only
+// after someone retypes a Token in the sheet; the newer row is the live one.
+function lastAttempt(list, attempt) {
+  const m = list.filter((x) => x.attempt === attempt);
+  return m[m.length - 1];
 }
 
 function closed() {
@@ -391,13 +433,18 @@ function answersOf(values) {
   return out;
 }
 
+// All rows for a token, oldest attempt first. The Token cell is normalised the
+// same way as the one the player types, so a row retyped as 1, 01 or " 1 " is
+// found. Retyping a row's Token moves that game to the new number and frees the
+// old one. Rows with the same attempt keep sheet order, so the lowest row wins
+// ties and the newest row is always last.
 function attemptsOf(sh, token) {
   const vals = sh.getDataRange().getValues();
   const list = [];
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][P.TOKEN]) === token) list.push({ row: i + 1, attempt: Number(vals[i][P.ATTEMPT]), values: vals[i] });
+    if (normToken(vals[i][P.TOKEN]) === token) list.push({ row: i + 1, attempt: Number(vals[i][P.ATTEMPT]) || 0, values: vals[i] });
   }
-  return list.sort((a, b) => a.attempt - b.attempt);
+  return list.sort((a, b) => a.attempt - b.attempt || a.row - b.row);
 }
 
 function setCell(sh, row, colIndex, value) {

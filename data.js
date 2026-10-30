@@ -31,7 +31,7 @@ const GAME = {
   howTo: [
     { icon: "yes", text: "Swipe right or tap Yes if you'd try the dish with a twist." },
     { icon: "no", text: "Swipe left or tap No to keep it the original way." },
-    { icon: "crush", text: "Round 2: one Desi Crush for your favourite cuisine." },
+    { icon: "crush", text: "At the end, pick one cuisine as your Desi Crush." },
   ],
   // Little stickers on the three cards on the start page (shown on hover or tap)
   fanStickers: [
@@ -61,10 +61,9 @@ const GAME = {
       cardBanner: "Would you try it desi-style?",
       yesMeans: "Yes, give it an Indian twist",
       noMeans: "No, keep it original",
-      crushMeans: "Desi Crush = your favourite (only one)",
       flashTitle: "Round 2",
       flashText: "World cuisines with a desi twist.",
-      flashCrush: "You get one Desi Crush. Give it to your favourite.",
+      flashCrush: "At the end you'll pick one of these as your Desi Crush.",
       flashSeconds: 2.5,
     },
   },
@@ -72,27 +71,22 @@ const GAME = {
   // ---------------------------------------------------------------- buttons
   buttons: { no: "No", yes: "Yes", crush: "Desi Crush", undo: "Undo" },
 
-  // ---------------------------------------------------------------- match screen (after Yes or Desi Crush)
-  // After a Yes, the twist slides in and the screen moves on by itself after
-  // minSeconds to maxSeconds (longer text = longer). A tap skips it.
-  // The Desi Crush screen waits for Next. A No has no screen: the next card comes in.
+  // ---------------------------------------------------------------- Desi Crush
+  // Yes and No have no screen: the card flies off and the next one comes in.
+  // After all 10 swipes the player MUST pick one cuisine as their Desi Crush.
+  // That pick is the only reveal screen in the game.
+  crushPick: {
+    kicker: "Last step",
+    title: "Pick your Desi Crush",
+    text: "One cuisine you'd most like to eat the desi way. You have to choose one.",
+    hint: "Tap a cuisine",
+  },
   results: {
-    match: "It's a match!",
     crush: "Desi crush!",
     desiName: "{name}, the desi way",
     teaserIntro: "On your first date, you might get:",
-    minSeconds: 2,
-    maxSeconds: 3.5,
-    tapHint: "Tap anywhere to continue",
-    next: "Next",
     last: "See my food profile",
-    change: "Change my answer",
-  },
-  moveCrush: {
-    title: "Move your Desi Crush?",
-    text: "You gave it to {from}. Move it to {to}?",
-    keep: "Keep it on {from}",
-    move: "Move it",
+    change: "Pick a different one",
   },
 
   // ---------------------------------------------------------------- full profile (the "See full profile" button)

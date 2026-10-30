@@ -12,7 +12,7 @@
   "use strict";
 
   const $ = (s, el = document) => el.querySelector(s);
-  const LS_STATE = "sg_state_v3"; // v3: rounds grouped (dishes 1-5, then cuisines 6-10)
+  const LS_STATE = "sg_state_v4"; // v4: no match screen; the Desi Crush is picked at the end
   const LS_QUEUE = "sg_queue_v1";
   const LS_DEVICE = "sg_device_v1";
   const CRUSH = "Super Like"; // value written to the sheet for a Desi Crush
@@ -180,6 +180,24 @@
   const cardById = (id) => CARDS.find((c) => c.id === id);
   const isYes = (a) => a === "Yes" || a === CRUSH;
 
+  // S.answers holds the plain Yes/No swipes. The Desi Crush is kept separately
+  // in S.crush and only merged in here, so changing the pick restores the
+  // cuisine's original Yes or No by itself.
+  function effective() {
+    const out = { ...S.answers };
+    if (S.crush) out[S.crush] = CRUSH;
+    return out;
+  }
+  // What the sheet should hold for the five round-2 cuisines.
+  function part2Answers() {
+    const e = effective();
+    const out = {};
+    CARDS.filter((c) => c.part === 2).forEach((c) => {
+      if (e[c.id]) out[c.id] = e[c.id];
+    });
+    return out;
+  }
+
   function firstUnanswered() {
     const i = CARDS.findIndex((c) => !S.answers[c.id]);
     return i < 0 ? CARDS.length : i;
@@ -220,8 +238,6 @@
     $("#exitConfirm").textContent = T.messages.exitLeave;
     $("#pBack").textContent = T.profileBack;
     $("#changeText").textContent = T.results.change;
-    $("#tapHint").textContent = T.results.tapHint;
-    $("#crushMeans").textContent = T.rounds[2].crushMeans || "";
     const how = $("#startHow");
     how.innerHTML = "";
     (T.howTo || []).forEach((s) => {
@@ -433,7 +449,6 @@
     $("#question").textContent = R.question;
     $("#yesMeans").textContent = R.yesMeans;
     $("#noMeans").textContent = R.noMeans;
-    $("#crushLegend").hidden = card.part !== 2;
     $("#counter").textContent = `Dish ${S.index + 1} of ${CARDS.length}`;
 
     const deck = $("#deck");
@@ -445,11 +460,6 @@
     attachDrag(top);
 
     $("#undoBtn").disabled = !S.last;
-    const crushBtn = $("#crushBtn");
-    crushBtn.hidden = card.part !== 2;
-    crushBtn.classList.toggle("is-used", !!S.crush);
-    $("#crushCount").textContent = S.crush ? "0" : "1";
-    crushBtn.setAttribute("aria-label", S.crush ? `Desi Crush (given to ${cardById(S.crush).name}; tap to move it)` : "Desi Crush (1 left)");
     renderProgress();
     preload(nextCard);
   }
@@ -633,110 +643,114 @@
 
   // ---------------------------------------------- answering
 
-  async function decide(answer, dir, opts = {}) {
+  // Yes and No have no screen: the card flies off and the next one comes in.
+  async function decide(answer, dir) {
     if (busy || !S || S.phase !== "play") return;
     const card = CARDS[S.index];
-    if (answer === CRUSH && card.part !== 2) return;
     busy = true;
     S.answers[card.id] = answer;
-    S.last = { id: card.id, answer, index: S.index, moved: opts.moveFrom || null };
-    if (answer === CRUSH) {
-      if (opts.moveFrom) {
-        // The earlier cuisine keeps a plain Yes.
-        S.answers[opts.moveFrom] = "Yes";
-        enqueue("undo", { token: S.token, attempt: S.attempt, card: opts.moveFrom, was: CRUSH });
-        enqueue("answer", { token: S.token, attempt: S.attempt, card: opts.moveFrom, answer: "Yes" });
-      }
-      S.crush = card.id;
-    }
-    if (answer !== "No") S.phase = "result";
+    S.last = { id: card.id, answer, index: S.index };
     save();
     enqueue("answer", { token: S.token, attempt: S.attempt, card: card.id, answer });
-    if (navigator.vibrate) navigator.vibrate(answer === "No" ? 15 : answer === CRUSH ? [30, 40, 60] : [20, 40, 30]);
+    if (navigator.vibrate) navigator.vibrate(answer === "No" ? 15 : [20, 40, 30]);
     const game = S;
     await flyOut($("#deck .is-top"), dir);
     busy = false;
     if (S !== game) return; // reset meanwhile (for example by a team restart)
-    if (answer === "No") return advance();
-    renderProgress();
-    showResult(card, answer);
+    advance();
   }
 
-  function crushTap() {
-    if (busy || !S || S.phase !== "play") return;
-    const card = CARDS[S.index];
-    if (card.part !== 2) return;
-    if (S.crush && S.crush !== card.id) {
-      const from = cardById(S.crush).name;
-      const M = T.moveCrush;
-      $("#moveTitle").textContent = M.title;
-      $("#moveText").textContent = fill(M.text, { from, to: card.name });
-      $("#moveKeep").textContent = fill(M.keep, { from });
-      $("#moveYes").textContent = M.move;
-      openOverlay("#moveDialog");
-      $("#moveYes").focus({ preventScroll: true });
-      return;
-    }
-    decide(CRUSH, "up");
+  // ---------------------------------------------- Desi Crush (mandatory)
+
+  // Shown once, after all ten swipes. The player must choose one cuisine.
+  function showCrushPick() {
+    S.phase = "crush";
+    S.last = null;
+    save();
+    const C = T.crushPick || {};
+    document.body.dataset.part = "2";
+    $("#crushKicker").textContent = C.kicker || "";
+    $("#crushTitle").textContent = C.title || "Pick your Desi Crush";
+    $("#crushText").textContent = C.text || "";
+    const host = $("#crushTiles");
+    host.innerHTML = "";
+    CARDS.filter((c) => c.part === 2).forEach((c) => {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "crush-tile";
+      if (S.crush === c.id) btn.classList.add("is-picked");
+      btn.dataset.answer = (S.answers[c.id] || "").toLowerCase();
+      btn.append(photoEl(c.photos[0], "tile-photo"));
+      const t = document.createElement("p");
+      t.innerHTML = "<b></b><span></span>";
+      t.firstChild.textContent = c.name;
+      t.lastChild.textContent = S.answers[c.id] || "";
+      btn.append(t);
+      const heart = document.createElement("span");
+      heart.className = "crush-mark";
+      heart.innerHTML = `<svg><use href="#i-crush"/></svg>`;
+      btn.append(heart);
+      btn.addEventListener("click", () => chooseCrush(c.id));
+      li.append(btn);
+      host.append(li);
+    });
+    hideResult();
+    show("crush");
+    renderProgress();
+  }
+
+  function chooseCrush(id) {
+    if (busy || !S || S.phase !== "crush") return;
+    const card = cardById(id);
+    if (!card || card.part !== 2) return;
+    S.crush = id;
+    S.phase = "result";
+    save();
+    // One request writes all five round-2 cells, so changing the pick puts the
+    // old cuisine back to its plain Yes or No.
+    enqueue("crush", { token: S.token, attempt: S.attempt, answers: part2Answers() });
+    if (navigator.vibrate) navigator.vibrate([30, 40, 60]);
+    showCrush(card);
   }
 
   function plate(photo, cls) {
     return photoEl(photo, `plate ${cls}`);
   }
 
-  // The match screen. Round 1: the original and its twist slide in and meet.
-  // Round 2: the cuisine's two desi dishes. Yes moves on by itself; the
-  // Desi Crush screen (plates crash together) waits for Next.
-  function showResult(card, answer) {
-    const crush = answer === CRUSH;
+  // The one reveal screen in the game: the two plates crash together and the
+  // chosen cuisine's desi dishes appear. It waits for the button.
+  function showCrush(card) {
     const R = T.results;
     const ov = $("#result");
-    ov.dataset.answer = crush ? "crush" : "yes";
+    ov.dataset.answer = "crush";
     ov.dataset.part = card.part;
     const plates = $("#plates");
     plates.innerHTML = "";
     const teasers = $("#teasers");
     teasers.innerHTML = "";
-    let name, line;
-    if (card.part === 1) {
-      plates.append(plate(card.photos[0], "plate-left"), plate(card.twist.photo, "plate-right"));
-      name = card.twist.name;
-      line = card.twist.line;
-    } else {
-      const d = card.desi || [];
-      plates.append(plate((d[0] || {}).photo || card.photos[0], "plate-left"), plate((d[1] || d[0] || {}).photo || card.photos[0], "plate-right"));
-      name = fill(R.desiName, { name: card.name });
-      line = R.teaserIntro;
-      d.forEach((x) => {
-        const li = document.createElement("li");
-        li.textContent = x.name;
-        teasers.append(li);
-      });
-    }
-    const title = crush ? R.crush : R.match;
-    $("#resultTitle").textContent = title;
-    $("#resultName").textContent = name;
-    $("#resultLine").textContent = line;
+    const d = card.desi || [];
+    plates.append(plate((d[0] || {}).photo || card.photos[0], "plate-left"), plate((d[1] || d[0] || {}).photo || card.photos[0], "plate-right"));
+    $("#resultTitle").textContent = R.crush;
+    $("#resultName").textContent = fill(R.desiName, { name: card.name });
+    $("#resultLine").textContent = R.teaserIntro;
+    d.forEach((x) => {
+      const li = document.createElement("li");
+      li.textContent = x.name;
+      teasers.append(li);
+    });
     const nextBtn = $("#nextBtn");
-    nextBtn.textContent = S.index === CARDS.length - 1 ? R.last : R.next;
-    nextBtn.hidden = !crush;
-    $("#tapHint").hidden = crush;
-    $("#timer").hidden = crush;
+    nextBtn.textContent = R.last;
+    nextBtn.hidden = false;
+    $("#changeText").textContent = R.change;
 
     ov.hidden = false;
     ov.classList.remove("is-in");
     void ov.offsetWidth;
     ov.classList.add("is-in");
-    burst($("#burst"), crush ? "crush" : "yes");
-
+    burst($("#burst"), "crush");
     clearTimeout(resultTimer);
-    if (crush) return nextBtn.focus({ preventScroll: true });
-    const len = title.length + name.length + line.length + teasers.textContent.length;
-    const min = (Number(R.minSeconds) || 2) * 1000;
-    const max = Math.max(min, (Number(R.maxSeconds) || 3.5) * 1000);
-    const ms = Math.max(min, Math.min(max, 1200 + len * 16));
-    $("#timer").style.setProperty("--ms", `${ms}ms`);
-    resultTimer = setTimeout(next, ms);
+    nextBtn.focus({ preventScroll: true });
   }
 
   function hideResult() {
@@ -762,36 +776,26 @@
     }
   }
 
-  // Leaves the match screen (timer, tap, or the Next button on a Desi Crush).
+  // The button on the Desi Crush screen: on to the food profile.
   function next() {
     if (busy || !S || S.phase !== "result") return;
     hideResult();
-    advance();
+    finish();
   }
 
   function advance() {
     S.index++;
-    if (S.index >= CARDS.length) return finish();
+    if (S.index >= CARDS.length) return showCrushPick();
     if (T.halftime && T.halftime.show && S.index === HALFTIME_AT && !S.sawHalftime) return showHalftime();
     goToCard();
   }
 
   // Undo works for the most recent swipe only.
   function undo() {
-    if (busy || !S || !S.last || (S.phase !== "play" && S.phase !== "result")) return;
-    const { id, answer, index, moved } = S.last;
+    if (busy || !S || !S.last || (S.phase !== "play" && S.phase !== "crush")) return;
+    const { id, answer, index } = S.last;
     delete S.answers[id];
     enqueue("undo", { token: S.token, attempt: S.attempt, card: id, was: answer });
-    if (answer === CRUSH) {
-      S.crush = null;
-      if (moved) {
-        // Give the Desi Crush back to the cuisine it came from.
-        S.answers[moved] = CRUSH;
-        S.crush = moved;
-        enqueue("undo", { token: S.token, attempt: S.attempt, card: moved, was: "Yes" });
-        enqueue("answer", { token: S.token, attempt: S.attempt, card: moved, answer: CRUSH });
-      }
-    }
     S.index = index;
     S.last = null;
     S.undos = (S.undos || 0) + 1;
@@ -852,7 +856,7 @@
   }
 
   function finish() {
-    const prof = profileFor(S.answers);
+    const prof = profileFor(effective());
     S.profile = prof.name;
     S.match = Math.floor(Math.random() * twistPool().length); // just for fun, not sent anywhere
     S.phase = "done";
@@ -864,7 +868,8 @@
 
   function renderDone() {
     const D = T.done;
-    const prof = profileFor(S.answers);
+    const A = effective();
+    const prof = profileFor(A);
     document.body.dataset.part = "";
     $("#doneKicker").textContent = D.kicker;
     $("#profileName").textContent = prof.name;
@@ -880,8 +885,8 @@
     mp.append(photoEl(m.photo, "match-photo"));
     const p1 = CARDS.filter((c) => c.part === 1);
     const p2 = CARDS.filter((c) => c.part === 2);
-    const yesIn = (list) => list.filter((c) => isYes(S.answers[c.id])).length;
-    const crush = CARDS.find((c) => S.answers[c.id] === CRUSH);
+    const yesIn = (list) => list.filter((c) => isYes(A[c.id])).length;
+    const crush = CARDS.find((c) => A[c.id] === CRUSH);
     const stats = $("#stats");
     stats.innerHTML = "";
     [
@@ -898,7 +903,7 @@
     const tiles = $("#tiles");
     tiles.innerHTML = "";
     CARDS.forEach((c) => {
-      const a = S.answers[c.id] || "";
+      const a = A[c.id] || "";
       const li = document.createElement("li");
       li.className = `tile part-${c.part}`;
       li.dataset.answer = a === CRUSH ? "crush" : a.toLowerCase();
@@ -921,7 +926,7 @@
     busy = false;
     store.del(LS_STATE);
     hideResult();
-    ["#exitDialog", "#profile", "#halftime", "#moveDialog"].forEach(closeOverlay);
+    ["#exitDialog", "#profile", "#halftime"].forEach(closeOverlay);
     $("#flash").hidden = true;
     document.body.dataset.part = "";
     showFormError("");
@@ -1044,26 +1049,19 @@
     }
     $("#yesBtn").addEventListener("click", () => decide("Yes", "right"));
     $("#noBtn").addEventListener("click", () => decide("No", "left"));
-    $("#crushBtn").addEventListener("click", crushTap);
     $("#undoBtn").addEventListener("click", undo);
     $("#changeBtn").addEventListener("click", (e) => {
       e.stopPropagation();
-      undo();
+      hideResult();
+      showCrushPick();
     });
     $("#nextBtn").addEventListener("click", (e) => {
       e.stopPropagation();
       next();
     });
-    $("#result").addEventListener("click", () => {
-      if ($("#result").dataset.answer !== "crush") next();
-    });
+
     $("#cookie").addEventListener("click", crackCookie);
     $("#halfBtn").addEventListener("click", halfBtn);
-    $("#moveKeep").addEventListener("click", () => closeOverlay("#moveDialog"));
-    $("#moveYes").addEventListener("click", () => {
-      closeOverlay("#moveDialog");
-      decide(CRUSH, "up", { moveFrom: S.crush });
-    });
     $("#pBack").addEventListener("click", () => closeOverlay("#profile"));
     $("#profile").addEventListener("click", (e) => {
       if (e.target.id === "profile") closeOverlay("#profile");
@@ -1081,7 +1079,7 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.target.closest("input, textarea, select")) return;
-      const open = ["#team", "#exitDialog", "#profile", "#moveDialog"].find((s) => !$(s).hidden);
+      const open = ["#team", "#exitDialog", "#profile"].find((s) => !$(s).hidden);
       if (open) {
         if (e.key === "Escape") closeOverlay(open);
         return;
@@ -1094,9 +1092,23 @@
         return;
       }
       if (S && S.phase === "result" && !$("#result").hidden) {
-        if (e.key === "Enter" || e.key === " " || (e.key === "ArrowRight" && $("#result").dataset.answer !== "crush")) {
+        if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") {
           e.preventDefault();
           next();
+        } else if (e.key === "Backspace" || e.key === "Delete") {
+          e.preventDefault();
+          hideResult();
+          showCrushPick();
+        }
+        return;
+      }
+      // The Desi Crush pick screen: 1 to 5 choose a cuisine.
+      if (S && S.phase === "crush") {
+        const n = Number(e.key);
+        const list = CARDS.filter((c) => c.part === 2);
+        if (n >= 1 && n <= list.length) {
+          e.preventDefault();
+          chooseCrush(list[n - 1].id);
         } else if (e.key === "Backspace" || e.key === "Delete") {
           e.preventDefault();
           undo();
@@ -1110,9 +1122,6 @@
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         decide("No", "left");
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        crushTap();
       } else if (e.key === "Backspace" || e.key === "Delete" || (e.key === "z" && (e.metaKey || e.ctrlKey))) {
         e.preventDefault();
         undo();
@@ -1142,11 +1151,12 @@
         show("play");
         renderPlay();
         showHalftime();
-      } else if (p === "result" && S.last && S.last.answer !== "No") {
-        S.index = S.last.index;
-        show("play");
-        renderPlay();
-        showResult(CARDS[S.last.index], S.last.answer);
+      } else if (p === "result" && S.crush) {
+        showCrushPick();
+        S.phase = "result";
+        showCrush(cardById(S.crush));
+      } else if (p === "crush" || firstUnanswered() >= CARDS.length) {
+        showCrushPick();
       } else {
         S.index = Math.min(S.index ?? firstUnanswered(), CARDS.length - 1);
         if (S.answers[CARDS[S.index].id]) S.index = firstUnanswered();

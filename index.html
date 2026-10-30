@@ -102,13 +102,11 @@
           <ul class="legend">
             <li class="legend-yes"><svg><use href="#i-yes"/></svg><span id="yesMeans"></span></li>
             <li class="legend-no"><svg><use href="#i-no"/></svg><span id="noMeans"></span></li>
-            <li class="legend-crush" id="crushLegend"><svg><use href="#i-crush"/></svg><span id="crushMeans"></span></li>
           </ul>
           <p class="counter" id="counter"></p>
           <ul class="keys" aria-label="Keyboard shortcuts">
             <li><kbd>←</kbd> No</li>
             <li><kbd>→</kbd> Yes</li>
-            <li class="key-crush"><kbd>↑</kbd> Desi Crush</li>
             <li><kbd>⌫</kbd> Undo</li>
           </ul>
         </div>
@@ -117,10 +115,19 @@
           <div class="controls">
             <button class="ctl ctl-undo" id="undoBtn" type="button"><svg><use href="#i-undo"/></svg><span data-btn="undo"></span></button>
             <button class="ctl ctl-no" id="noBtn" type="button"><svg><use href="#i-no"/></svg><span data-btn="no"></span></button>
-            <button class="ctl ctl-crush" id="crushBtn" type="button"><svg><use href="#i-crush"/></svg><span data-btn="crush"></span><b class="crush-count" id="crushCount">1</b></button>
             <button class="ctl ctl-yes" id="yesBtn" type="button"><svg><use href="#i-yes"/></svg><span data-btn="yes"></span></button>
           </div>
         </div>
+      </section>
+
+      <!-- Pick your Desi Crush (mandatory, after all 10 swipes) -->
+      <section class="screen screen-crush" id="screen-crush" aria-labelledby="crushTitle">
+        <div class="crush-head">
+          <p class="crush-kicker" id="crushKicker"></p>
+          <h2 id="crushTitle"></h2>
+          <p class="crush-text" id="crushText"></p>
+        </div>
+        <ul class="crush-tiles" id="crushTiles" aria-label="Pick your Desi Crush"></ul>
       </section>
 
       <!-- Done -->
@@ -169,8 +176,6 @@
         <button class="btn-primary btn-big" id="nextBtn" type="button"></button>
         <button class="btn-quiet" id="changeBtn" type="button"><svg><use href="#i-undo"/></svg><span id="changeText"></span></button>
       </div>
-      <div class="timer" id="timer" aria-hidden="true"><span></span></div>
-      <p class="tap-hint-result" id="tapHint"></p>
     </div>
     <div class="burst" id="burst" aria-hidden="true"></div>
   </div>
@@ -201,18 +206,6 @@
       <button class="btn-primary btn-big" id="halfBtn" type="button"></button>
     </div>
     <div class="burst" id="halfBurst" aria-hidden="true"></div>
-  </div>
-
-  <!-- Move Desi Crush -->
-  <div class="overlay overlay-dim" id="moveDialog" hidden>
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="moveTitle">
-      <h2 id="moveTitle"></h2>
-      <p id="moveText"></p>
-      <div class="dialog-actions">
-        <button class="btn-quiet" id="moveKeep" type="button"></button>
-        <button class="btn-primary btn-crush" id="moveYes" type="button"></button>
-      </div>
-    </div>
   </div>
 
   <!-- Confirm exit -->

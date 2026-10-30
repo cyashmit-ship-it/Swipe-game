@@ -27,7 +27,7 @@ The game is a website on GitHub Pages. Every swipe goes to the Google Sheet **Sw
 
 ## 1b. Updating the Apps Script to a new version of Code.gs
 
-Do this whenever Code.gs in this repo changes (29 Oct: column reorder; later on 29 Oct: numbers-only tokens and one device per token; 30 Oct: deleted rows free a token, Game admin menu).
+Do this whenever Code.gs in this repo changes (29 Oct: column reorder; later on 29 Oct: numbers-only tokens and one device per token; 30 Oct: deleted rows free a token, Game admin menu; 31 Oct: no match screen, the Desi Crush is picked at the end, retyping a token moves the game).
 
 1. Open `apps-script/Code.gs` in this repo on GitHub. Click the **copy icon** (two squares, top right of the code). The whole file is copied.
 2. Open the sheet **Swipe Game Responses** → **Extensions → Apps Script**.
@@ -80,9 +80,9 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 | `howTo` | The 3 "how it works" lines on the start screen |
 | `fanStickers` | Stickers on the 3 cards of the start screen |
 | `rounds` → `1` / `2` | Round title flash, the question, the card banner, the yes/no meanings. `flashSeconds` = how long the round title stays up |
-| `buttons` | Yes / No / Desi Crush / Undo labels |
-| `results` | The match screen after Yes, and the Desi Crush screen. `minSeconds` / `maxSeconds` = how long the match screen stays before moving on |
-| `moveCrush` | The "Move your Desi Crush?" box |
+| `buttons` | Yes / No / Undo labels |
+| `crushPick` | The "Pick your Desi Crush" screen after all 10 swipes |
+| `results` | The Desi Crush reveal screen (the only reveal in the game) |
 | `profileButton`, `profileLabels` | The "See full profile" sheet |
 | `halftime`, `fortunes` | Fortune cookie (off; `show: true` turns it on, between round 1 and 2) |
 | `done`, `profiles` | End screen, the random "perfect match" line, and the 5 food personalities |
@@ -99,7 +99,8 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 | Attempt | 1 for the first game. 2+ only after a team member allows a replay or a restart. |
 | Status | In progress, Completed, Replay allowed (not started yet), Restarted (unfinished). |
 | Duplicate | Empty for a first game. `YES (replay…)` or `Restart (…)` for extra attempts. |
-| P1 Masala Dosa … P2 Japanese | Yes, No or **Super Like**. "Super Like" is what the game calls **Desi Crush** (round 2 only, one per player). Columns are in play order: the 5 round-1 dishes, then the 5 cuisines. In round 1, "Yes" means yes to the twist shown on the card (for example Schezwan Dosa). |
+| P1 Masala Dosa … P2 Japanese | Yes, No or **Super Like**. Columns are in play order: the 5 round-1 dishes, then the 5 cuisines. In round 1, "Yes" means yes to the twist on the card (for example Schezwan Dosa). |
+| Super Like | What the game calls the **Desi Crush**. Always exactly one, always on a round-2 cuisine. Every player has to pick one, at the end, after all 10 swipes. The pick replaces that cuisine's own Yes or No, so a Super Like counts as a Yes. |
 | Yes total, Super Likes | Filled when the game is completed. Yes total includes the Desi Crush. |
 | Undos | Times the player changed an answer. Moving the Desi Crush to another cuisine also adds 1. |
 | Profile type | The fun end-of-game profile they were shown. |
@@ -107,9 +108,22 @@ If the game shows a blank page after an edit, a quote or comma is broken. Open d
 
 For analysis, use rows with **Status = Completed**. Decide whether to keep or drop rows where Duplicate is filled.
 
-**Swipe log**: every answer, undo, start and finish, with the time. "Card #" is the dish's position in the game (1–10).
+**Swipe log**: every answer, undo, start and finish, with the time. "Card #" is the dish's position in the game (1–10). The Desi Crush is logged as a "Desi Crush" line; if the player changes their pick, you see one line per pick.
 
 **Overrides**: every replay and restart, with the team member's name and reason. Replays done from the sheet menu say "Allowed a replay (sheet menu)".
+
+### Changing a token number
+
+If a slip was handed out twice, or a player was given the wrong number, you can retype the **Token** cell in the Players tab.
+
+1. Find the row in **Players**.
+2. Click the **Token** cell and type the new number. Press Enter.
+3. That whole game, with all its answers, now belongs to the new number. The old number is free again straight away and can be handed out.
+
+- Type numbers only. `1`, `01` and `001` all count as token 1.
+- If the new number already has a row of its own, you now have two rows for it. The game uses the lower row. Avoid this: check the new number is unused first.
+- The **Swipe log** keeps the old number on the lines written before the change. That tab is only a history, so it changes nothing. Use **Players** for analysis.
+- If the game was still open on a device, that device goes back to the start screen.
 
 ### Freeing a token by deleting its rows
 
@@ -136,6 +150,7 @@ To make a token usable again as if it was never played (for example test games, 
   - **In the sheet:** **Game admin → Allow a replay for a token**. Type the token, your name and a reason. A new row appears in Players, or
   - **On the game device:** Team tools → Check token → **Allow a replay** with a reason.
 - **Player walked away mid-game:** tap **Exit** (top right). The same token carries on later from where it stopped, **on the same device**.
+- **The Desi Crush is compulsory.** After the 10th swipe, the player must tap one of the five cuisines. Nothing moves on until they do. If a player refuses, tap any cuisine for them or use **Restart unfinished game**.
 - **"Token X is already playing on another device":** that token's game is still open on another laptop, iPad or phone. Finish it there. If that device died or is busy: Team tools → Check token (it shows which device has it) → **Restart unfinished game**. The token then starts from dish 1 on any device.
 - **Don't clear browser history or site data on the game devices** during the fest. The device would look new and be locked out of its own unfinished game (fix: Restart unfinished game).
 - **Something looks stuck:** reload the page. The game resumes where it was. Team tools also has **Reload page**.
